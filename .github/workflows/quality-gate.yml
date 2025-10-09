@@ -1,0 +1,12 @@
+name: Code Quality Gate
+on:
+  pull_request:
+    branches: [ production ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Coverage & Quality Checks
+        run: ./gradlew jacocoTestReport sonarqube -Dsonar.qualitygate.wait=true
