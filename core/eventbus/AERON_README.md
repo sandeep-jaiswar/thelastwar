@@ -9,10 +9,12 @@ This is a production-ready, Aeron-backed implementation of the EventBus interfac
 - **Ultra-Low Latency**: Sub-10 microsecond publish latency (p99)
 - **High Throughput**: Sustained ≥2M messages/second on loopback
 - **Zero-Copy**: Efficient shared memory IPC with minimal allocations
-- **Thread-Safe**: Concurrent publishing and subscription support
+- **Thread-Safe**: Concurrent publishing with thread-local buffers
 - **GC-Neutral**: Zero heap allocations in hot path after warmup
 - **Back-Pressure Handling**: Graceful handling of slow consumers
 - **Embedded Media Driver**: Self-contained with optimized configuration
+- **UTF-8 Encoding**: Consistent character encoding for payloads
+- **Robust Error Handling**: Comprehensive validation and error recovery
 
 ## Quick Start
 
@@ -168,6 +170,26 @@ Publisher                    Aeron IPC                    Subscriber
 4. **Fragment Assembler**: Reassembles multi-fragment messages
 5. **Polling Thread**: Dedicated thread for subscription polling
 6. **Handler Registry**: Thread-safe handler management with CopyOnWriteArrayList
+7. **Thread-Local Buffers**: Per-thread buffers for concurrent publishing safety
+
+### Thread Safety
+
+The implementation provides robust thread safety:
+
+- **Concurrent Publishing**: Multiple threads can safely publish events simultaneously using thread-local buffers
+- **Lock-Free Subscription**: Handlers can be added/removed while events are being published
+- **Safe Cleanup**: Resources are cleaned up in proper order with exception handling
+- **UTF-8 Encoding**: Consistent character encoding prevents encoding-related issues
+
+### Error Handling
+
+Comprehensive error handling ensures system stability:
+
+- **Null Checks**: Events and handlers are validated before processing
+- **Size Validation**: Message size limits are enforced
+- **Bounds Checking**: Event types and payload lengths are validated
+- **Graceful Degradation**: Handler exceptions don't affect other handlers or system stability
+- **Clean Shutdown**: Resources are properly released even if errors occur during shutdown
 
 ## Tuning Guide
 

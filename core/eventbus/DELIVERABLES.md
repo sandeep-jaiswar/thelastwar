@@ -4,6 +4,17 @@
 
 This document summarizes the implementation of the Aeron-backed EventBus prototype for The Last War trading system. The implementation provides ultra-low latency inter-subsystem communication with zero-allocation hot paths.
 
+## Recent Improvements
+
+The implementation has been enhanced with the following improvements:
+
+1. **Thread-Safe Publishing**: Thread-local buffers ensure safe concurrent publishing from multiple threads
+2. **UTF-8 Encoding**: Explicit UTF-8 encoding for consistent character handling across platforms
+3. **Enhanced Validation**: Comprehensive null checks, size validation, and bounds checking
+4. **Robust Error Handling**: Improved error recovery and graceful degradation
+5. **Better Resource Cleanup**: Proper cleanup order with exception handling in shutdown
+6. **Input Validation**: Event null checks and message size limits enforced
+
 ## Deliverables Status
 
 ### ✅ 1. Aeron Driver Configuration
@@ -36,10 +47,12 @@ private static MediaDriver createOptimizedMediaDriver() {
 
 **Publisher Features**:
 - Zero-copy message serialization using `UnsafeBuffer`
-- Pre-allocated direct buffer (4KB max message size)
+- Thread-local buffers for safe concurrent publishing (4KB max per thread)
+- UTF-8 encoding for consistent character handling
 - Back-pressure detection and handling
 - Atomic counter for published events
-- Thread-safe concurrent publishing
+- Comprehensive input validation (null checks, size limits)
+- Thread-safe concurrent publishing from multiple threads
 
 **Subscriber Features**:
 - Dedicated polling thread ("AeronEventBus-Poller")

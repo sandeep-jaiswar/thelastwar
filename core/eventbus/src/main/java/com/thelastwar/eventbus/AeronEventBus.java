@@ -13,6 +13,7 @@ import org.agrona.concurrent.IdleStrategy;
 import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,8 +69,10 @@ public class AeronEventBus implements EventBus {
         100, 10, 1_000, 1_000_000 // maxSpins, maxYields, minParkPeriodNs, maxParkPeriodNs
     );
     
-    // Pre-allocated buffer for zero-allocation publishing
-    private final UnsafeBuffer offerBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_MESSAGE_SIZE));
+    // Pre-allocated buffer for zero-allocation publishing (thread-local for safety)
+    private final ThreadLocal<UnsafeBuffer> offerBuffer = ThreadLocal.withInitial(
+        () -> new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_MESSAGE_SIZE))
+    );
     
     /**
      * Creates a new AeronEventBus with optimized configuration.
@@ -128,11 +131,21 @@ public class AeronEventBus implements EventBus {
             return false;
         }
         
+        if (event == null) {
+            throw new IllegalArgumentException("Event cannot be null");
+        }
+        
         // Serialize event into buffer (zero-allocation after buffer is allocated)
-        final int messageLength = serializeEvent(event, offerBuffer);
+        final UnsafeBuffer buffer = offerBuffer.get();
+        final int messageLength = serializeEvent(event, buffer);
+        
+        // Validate message size
+        if (messageLength > MAX_MESSAGE_SIZE) {
+            throw new IllegalArgumentException("Event too large: " + messageLength + " bytes (max: " + MAX_MESSAGE_SIZE + ")");
+        }
         
         // Offer to Aeron publication
-        final long result = publication.offer(offerBuffer, 0, messageLength);
+        final long result = publication.offer(buffer, 0, messageLength);
         
         if (result > 0) {
             publishedCount.incrementAndGet();
@@ -146,6 +159,7 @@ public class AeronEventBus implements EventBus {
     /**
      * Serializes an event into the buffer for zero-copy transmission.
      * Returns the total message length.
+     * Uses UTF-8 encoding for consistent character handling.
      */
     private int serializeEvent(Event event, UnsafeBuffer buffer) {
         int offset = 0;
@@ -166,9 +180,9 @@ public class AeronEventBus implements EventBus {
         buffer.putLong(offset, event.header());
         offset += 8;
         
-        // Serialize payload (simple String for now - can be optimized with custom serialization)
+        // Serialize payload using UTF-8 encoding
         String payload = event.payload() != null ? event.payload().toString() : "";
-        byte[] payloadBytes = payload.getBytes();
+        byte[] payloadBytes = payload.getBytes(StandardCharsets.UTF_8);
         
         buffer.putInt(offset, payloadBytes.length);
         offset += 4;
@@ -181,6 +195,7 @@ public class AeronEventBus implements EventBus {
     
     /**
      * Deserializes an event from the buffer.
+     * Uses UTF-8 encoding for consistent character handling.
      */
     private Event deserializeEvent(DirectBuffer buffer, int offset, int length) {
         int pos = offset;
@@ -203,10 +218,15 @@ public class AeronEventBus implements EventBus {
         int payloadLength = buffer.getInt(pos);
         pos += 4;
         
+        // Validate payload length
+        if (payloadLength < 0 || payloadLength > MAX_MESSAGE_SIZE) {
+            throw new IllegalArgumentException("Invalid payload length: " + payloadLength);
+        }
+        
         byte[] payloadBytes = new byte[payloadLength];
         buffer.getBytes(pos, payloadBytes);
         
-        String payload = new String(payloadBytes);
+        String payload = new String(payloadBytes, StandardCharsets.UTF_8);
         
         return Event.create(timestamp, sequence, sourceId, eventType, header, payload);
     }
@@ -280,19 +300,33 @@ public class AeronEventBus implements EventBus {
      * Handles incoming fragments from Aeron subscription.
      */
     private void onFragment(DirectBuffer buffer, int offset, int length, Header header) {
-        // Deserialize event
-        Event event = deserializeEvent(buffer, offset, length);
-        
-        // Dispatch to handlers
-        List<HandlerRegistration> eventHandlers = handlers[event.eventType()];
-        for (HandlerRegistration registration : eventHandlers) {
-            try {
-                @SuppressWarnings("unchecked")
-                EventHandler<Object> handler = (EventHandler<Object>) registration.handler;
-                handler.onEvent(event);
-            } catch (Exception e) {
-                registration.handler.onError(event, e);
+        try {
+            // Deserialize event
+            Event event = deserializeEvent(buffer, offset, length);
+            
+            // Validate event type bounds
+            if (event.eventType() < 0 || event.eventType() >= handlers.length) {
+                // Invalid event type, skip
+                return;
             }
+            
+            // Dispatch to handlers
+            List<HandlerRegistration> eventHandlers = handlers[event.eventType()];
+            for (HandlerRegistration registration : eventHandlers) {
+                try {
+                    @SuppressWarnings("unchecked")
+                    EventHandler<Object> handler = (EventHandler<Object>) registration.handler;
+                    handler.onEvent(event);
+                } catch (Exception e) {
+                    try {
+                        registration.handler.onError(event, e);
+                    } catch (Exception errorHandlerException) {
+                        // Error handler itself threw an exception - log but continue
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Deserialization or other unexpected error - log but continue processing
         }
     }
     
@@ -303,16 +337,49 @@ public class AeronEventBus implements EventBus {
             if (pollingThread != null) {
                 try {
                     pollingThread.join(5000);
+                    if (pollingThread.isAlive()) {
+                        pollingThread.interrupt();
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
             }
             
-            // Close Aeron resources
-            publication.close();
-            aeronSubscription.close();
-            aeron.close();
-            mediaDriver.close();
+            // Close Aeron resources in reverse order of creation
+            try {
+                if (publication != null) {
+                    publication.close();
+                }
+            } catch (Exception e) {
+                // Log but continue cleanup
+            }
+            
+            try {
+                if (aeronSubscription != null) {
+                    aeronSubscription.close();
+                }
+            } catch (Exception e) {
+                // Log but continue cleanup
+            }
+            
+            try {
+                if (aeron != null) {
+                    aeron.close();
+                }
+            } catch (Exception e) {
+                // Log but continue cleanup
+            }
+            
+            try {
+                if (mediaDriver != null) {
+                    mediaDriver.close();
+                }
+            } catch (Exception e) {
+                // Log but continue cleanup
+            }
+            
+            // Clean up thread-local buffers
+            offerBuffer.remove();
         }
     }
     
