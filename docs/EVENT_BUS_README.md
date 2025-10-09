@@ -15,11 +15,12 @@ The Event Bus provides a GC-neutral publish/subscribe mechanism with sub-10 micr
 ### Architecture Alignment
 
 This implementation follows the core architecture principles:
-- **Java 17+ with Records**: Compact, efficient event representation (Java 21 recommended)
+- **Java 21 Target**: Using Java 17+ Records (targeting Java 21 as per architecture)
 - **GC-Neutral Design**: Object pooling, primitive types, zero allocation in hot path
 - **Mechanical Sympathy**: Lock-free structures, CPU affinity support
 - **Deterministic Replay**: Event log as system-of-record, sequence-based ordering
 - **Performance Targets**: < 10 µs round-trip, > 2M msgs/sec throughput
+- **Gradle Build**: Gradle 8.8+ with Kotlin DSL as specified in architecture
 
 ## Architecture
 
@@ -151,29 +152,24 @@ EventType.LATENCY_SAMPLE           // 5001
 ### Build the project
 
 ```bash
-mvn clean compile
+./gradlew build
 ```
 
 ### Run unit tests
 
 ```bash
-mvn test
+./gradlew test
 ```
 
 ### Run microbenchmarks
 
 ```bash
-mvn clean test-compile
-mvn exec:java -Dexec.mainClass="org.openjdk.jmh.Main" \
-              -Dexec.classpathScope=test \
-              -Dexec.args="EventBusBenchmark"
+./gradlew jmh
 ```
 
 Or run specific benchmark:
 ```bash
-mvn exec:java -Dexec.mainClass="org.openjdk.jmh.Main" \
-              -Dexec.classpathScope=test \
-              -Dexec.args="EventBusBenchmark.benchmarkPublish"
+./gradlew jmh --args="EventBusBenchmark.benchmarkPublish"
 ```
 
 ## Performance Characteristics
@@ -231,28 +227,40 @@ plantuml docs/uml/eventbus-message-flow.puml
 ## Project Structure
 
 ```
-src/
-├── main/java/com/thelastwar/eventbus/
-│   ├── EventBus.java          # Main interface
-│   ├── Event.java             # Event model
-│   ├── EventType.java         # Event type constants
-│   ├── EventHandler.java      # Handler interface
-│   └── SourceId.java          # Source identifiers
-└── test/java/com/thelastwar/eventbus/
-    ├── EventTest.java         # Event unit tests
-    ├── EventTypeTest.java     # EventType unit tests
-    ├── EventHandlerTest.java  # Handler unit tests
-    ├── EventBusTest.java      # EventBus unit tests
-    ├── SourceIdTest.java      # SourceId unit tests
-    ├── InMemoryEventBus.java  # Test implementation
-    └── benchmark/
-        └── EventBusBenchmark.java  # JMH benchmarks
-
-docs/
-├── uml/
-│   └── eventbus-message-flow.puml  # UML sequence diagram
-└── adr/
-    └── 001-event-bus-technology-selection.md  # Architecture decision record
+thelastwar/
+├── core/
+│   └── eventbus/
+│       ├── build.gradle.kts
+│       └── src/
+│           ├── main/java/com/thelastwar/eventbus/
+│           │   ├── EventBus.java          # Main interface
+│           │   ├── Event.java             # Event record
+│           │   ├── EventType.java         # Type constants
+│           │   ├── EventHandler.java      # Handler interface
+│           │   ├── EventPool.java         # Object pooling
+│           │   └── SourceId.java          # Source identifiers
+│           └── test/java/com/thelastwar/eventbus/
+│               ├── EventTest.java
+│               ├── EventTypeTest.java
+│               ├── EventHandlerTest.java
+│               ├── EventBusTest.java
+│               ├── EventPoolTest.java
+│               ├── SourceIdTest.java
+│               ├── InMemoryEventBus.java  # Test implementation
+│               ├── benchmark/
+│               │   └── EventBusBenchmark.java
+│               └── example/
+│                   ├── EventBusExample.java
+│                   └── EventPoolExample.java
+├── docs/
+│   ├── EVENT_BUS_README.md
+│   ├── uml/
+│   │   └── eventbus-message-flow.puml
+│   └── adr/
+│       └── 001-event-bus-technology-selection.md
+├── build.gradle.kts          # Root build file
+├── settings.gradle.kts       # Project settings
+└── gradlew                   # Gradle wrapper
 ```
 
 ## Design Goals

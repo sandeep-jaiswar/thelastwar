@@ -169,6 +169,13 @@ public class AeronEventBus implements EventBus {
 }
 ```
 
+Build and test:
+```bash
+./gradlew :core:eventbus:build
+./gradlew :core:eventbus:test
+./gradlew :core:eventbus:jmh
+```
+
 ### Phase 2: Chronicle Queue Adapter (Optional)
 ```java
 public class ChronicleEventBus implements EventBus {
