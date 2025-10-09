@@ -1,0 +1,19 @@
+name: Latency Benchmark Validation
+on:
+  pull_request:
+    branches: [ production ]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Run JMH Benchmarks
+        run: ./gradlew jmh
+      - name: Compare Results
+        run: ./scripts/check-latency-regression.sh
