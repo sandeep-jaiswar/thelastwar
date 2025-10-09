@@ -6,7 +6,15 @@ package com.thelastwar.eventbus;
  * This interface provides a GC-neutral publish/subscribe mechanism with the following guarantees:
  * - No autoboxing in the hot path
  * - Minimal allocations during publish/subscribe operations
- * - Sub-5 microsecond publish/subscribe latency
+ * - Sub-10 microsecond round-trip latency (per architecture targets)
+ * - Support for deterministic replay via sequence numbers
+ * - Event log as system-of-record for state recovery
+ * 
+ * Architecture alignment:
+ * - Follows single-writer principle where possible
+ * - Supports mechanical sympathy patterns
+ * - Enables lock-free implementations
+ * - Append-only event flow for replay determinism
  * 
  * Thread-safety: Implementations must be thread-safe for concurrent publishing and subscribing.
  */
@@ -15,6 +23,8 @@ public interface EventBus {
     /**
      * Publishes an event to all subscribed handlers for the event type.
      * This is a hot-path method designed for minimal latency.
+     * 
+     * Performance target: < 10 µs round-trip (architecture requirement)
      * 
      * @param event The event to publish (must not be null)
      * @return true if the event was successfully published, false otherwise
@@ -71,7 +81,32 @@ public interface EventBus {
     int getSubscriberCount(int eventType);
     
     /**
+     * Returns the current sequence number for event ordering.
+     * Critical for deterministic replay - each event should have an incrementing sequence.
+     * 
+     * @return current sequence number
+     */
+    default long getCurrentSequence() {
+        return getPublishedEventCount();
+    }
+    
+    /**
+     * Replays events from a specific sequence number.
+     * Enables deterministic replay for state recovery.
+     * 
+     * @param fromSequence Starting sequence number
+     * @param toSequence Ending sequence number (inclusive)
+     * @param handler Handler to receive replayed events
+     * @return number of events replayed
+     */
+    default long replay(long fromSequence, long toSequence, EventHandler<?> handler) {
+        // Default implementation - override for replay support
+        throw new UnsupportedOperationException("Replay not supported by this implementation");
+    }
+    
+    /**
      * Starts the event bus and any background processing threads.
+     * May pin threads to CPU cores for mechanical sympathy.
      */
     void start();
     

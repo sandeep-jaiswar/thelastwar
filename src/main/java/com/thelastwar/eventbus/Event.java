@@ -1,74 +1,89 @@
 package com.thelastwar.eventbus;
 
 /**
- * Immutable Event model with metadata for the Event Bus.
- * Designed to be GC-neutral by using primitive types where possible.
+ * Immutable Event record with metadata for the Event Bus.
+ * Uses Java 21 record for compact, efficient representation.
+ * Designed for GC-neutral operation with primitive types and object pooling support.
+ * 
+ * Performance characteristics:
+ * - Zero allocation in hot path when using object pools
+ * - Compact memory layout via record
+ * - All metadata as primitives (no autoboxing)
+ * - Suitable for deterministic replay
+ * 
+ * @param timestamp Event timestamp in nanoseconds (System.nanoTime())
+ * @param sequence Sequence number for ordering and deterministic replay
+ * @param sourceId Source subsystem identifier (use SourceId constants)
+ * @param eventType Type of event (use EventType constants)
+ * @param header Additional header metadata packed as long (8 bytes of flags/metadata)
+ * @param payload Event payload (prefer pooled objects or off-heap references)
  */
-public final class Event {
-    private final long timestamp;
-    private final long sequence;
-    private final int sourceId;
-    private final int eventType;
-    private final long header;
-    private final Object payload; // Actual payload - can be reused object pool reference
-
-    private Event(long timestamp, long sequence, int sourceId, int eventType, long header, Object payload) {
-        this.timestamp = timestamp;
-        this.sequence = sequence;
-        this.sourceId = sourceId;
-        this.eventType = eventType;
-        this.header = header;
-        this.payload = payload;
-    }
-
+public record Event(
+    long timestamp,
+    long sequence,
+    int sourceId,
+    int eventType,
+    long header,
+    Object payload
+) {
     /**
-     * Creates a new Event instance.
+     * Factory method for creating events.
+     * Use this for clarity and to support future object pooling.
      * 
      * @param timestamp Event timestamp in nanoseconds
      * @param sequence Sequence number for ordering
-     * @param sourceId Source subsystem identifier (use constants)
-     * @param eventType Type of event (use EventType constants)
-     * @param header Additional header metadata packed as long
-     * @param payload Event payload
+     * @param sourceId Source subsystem identifier
+     * @param eventType Type of event
+     * @param header Additional header metadata
+     * @param payload Event payload (can be pooled object reference)
      * @return new Event instance
      */
     public static Event create(long timestamp, long sequence, int sourceId, int eventType, long header, Object payload) {
         return new Event(timestamp, sequence, sourceId, eventType, header, payload);
     }
-
-    public long getTimestamp() {
-        return timestamp;
+    
+    /**
+     * Creates an event with current timestamp.
+     * Useful for immediate event creation.
+     * 
+     * @param sequence Sequence number
+     * @param sourceId Source identifier
+     * @param eventType Event type
+     * @param header Header metadata
+     * @param payload Payload
+     * @return new Event with current timestamp
+     */
+    public static Event now(long sequence, int sourceId, int eventType, long header, Object payload) {
+        return new Event(System.nanoTime(), sequence, sourceId, eventType, header, payload);
     }
-
-    public long getSequence() {
-        return sequence;
+    
+    /**
+     * Extracts latency from current time to event timestamp.
+     * Useful for monitoring and latency tracking.
+     * 
+     * @return latency in nanoseconds
+     */
+    public long getLatencyNanos() {
+        return System.nanoTime() - timestamp;
     }
-
-    public int getSourceId() {
-        return sourceId;
+    
+    /**
+     * Checks if this event is from a specific source.
+     * 
+     * @param expectedSourceId Source ID to check
+     * @return true if matches
+     */
+    public boolean isFromSource(int expectedSourceId) {
+        return this.sourceId == expectedSourceId;
     }
-
-    public int getEventType() {
-        return eventType;
-    }
-
-    public long getHeader() {
-        return header;
-    }
-
-    public Object getPayload() {
-        return payload;
-    }
-
-    @Override
-    public String toString() {
-        return "Event{" +
-                "timestamp=" + timestamp +
-                ", sequence=" + sequence +
-                ", sourceId=" + sourceId +
-                ", eventType=" + eventType +
-                ", header=" + header +
-                ", payload=" + payload +
-                '}';
+    
+    /**
+     * Checks if this event is of a specific type.
+     * 
+     * @param expectedEventType Event type to check
+     * @return true if matches
+     */
+    public boolean isOfType(int expectedEventType) {
+        return this.eventType == expectedEventType;
     }
 }

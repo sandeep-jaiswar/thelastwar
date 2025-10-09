@@ -17,7 +17,7 @@ public class EventBusExample {
         System.out.println("=== Example 1: Simple Subscriber ===");
         EventBus.Subscription subscription = eventBus.subscribe(
             EventType.MARKET_DATA_UPDATE,
-            event -> System.out.println("Received market data: " + event.getPayload())
+            event -> System.out.println("Received market data: " + event.payload())
         );
         
         // Publish a market data event
@@ -35,12 +35,12 @@ public class EventBusExample {
         System.out.println("\n=== Example 2: Multiple Subscribers ===");
         eventBus.subscribe(
             EventType.ORDER_FILLED,
-            event -> System.out.println("Risk Manager: Order filled - " + event.getPayload())
+            event -> System.out.println("Risk Manager: Order filled - " + event.payload())
         );
         
         eventBus.subscribe(
             EventType.ORDER_FILLED,
-            event -> System.out.println("Analytics: Recording trade - " + event.getPayload())
+            event -> System.out.println("Analytics: Recording trade - " + event.payload())
         );
         
         Event orderFilledEvent = Event.create(

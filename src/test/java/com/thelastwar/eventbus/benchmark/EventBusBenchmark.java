@@ -9,6 +9,10 @@ import java.util.concurrent.TimeUnit;
 /**
  * JMH Microbenchmark for EventBus latency.
  * 
+ * Performance targets (per architecture):
+ * - Event Bus round-trip: < 10 µs (10,000 ns)
+ * - Throughput: > 2 million msgs/sec
+ * 
  * Run with: mvn test-compile exec:java -Dexec.mainClass="org.openjdk.jmh.Main" -Dexec.classpathScope=test
  * 
  * Or manually compile and run:
@@ -56,7 +60,7 @@ public class EventBusBenchmark {
 
     /**
      * Benchmark: Publish an event and measure latency.
-     * Target: < 5000 nanoseconds (5 microseconds)
+     * Target: < 10000 nanoseconds (10 microseconds) per architecture
      */
     @Benchmark
     public boolean benchmarkPublish(BenchmarkState state) {

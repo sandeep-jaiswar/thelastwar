@@ -18,12 +18,12 @@ class EventTest {
         Event event = Event.create(timestamp, sequence, sourceId, eventType, header, payload);
 
         assertNotNull(event);
-        assertEquals(timestamp, event.getTimestamp());
-        assertEquals(sequence, event.getSequence());
-        assertEquals(sourceId, event.getSourceId());
-        assertEquals(eventType, event.getEventType());
-        assertEquals(header, event.getHeader());
-        assertEquals(payload, event.getPayload());
+        assertEquals(timestamp, event.timestamp());
+        assertEquals(sequence, event.sequence());
+        assertEquals(sourceId, event.sourceId());
+        assertEquals(eventType, event.eventType());
+        assertEquals(header, event.header());
+        assertEquals(payload, event.payload());
     }
 
     @Test
@@ -33,10 +33,10 @@ class EventTest {
         Event event2 = Event.create(timestamp, 1L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L, "payload1");
 
         // Events with same values should be equal in their properties
-        assertEquals(event1.getTimestamp(), event2.getTimestamp());
-        assertEquals(event1.getSequence(), event2.getSequence());
-        assertEquals(event1.getSourceId(), event2.getSourceId());
-        assertEquals(event1.getEventType(), event2.getEventType());
+        assertEquals(event1.timestamp(), event2.timestamp());
+        assertEquals(event1.sequence(), event2.sequence());
+        assertEquals(event1.sourceId(), event2.sourceId());
+        assertEquals(event1.eventType(), event2.eventType());
     }
 
     @Test
@@ -56,7 +56,7 @@ class EventTest {
         Event event = Event.create(System.nanoTime(), 1L, SourceId.OMS, EventType.ORDER_SUBMITTED, 0L, null);
 
         assertNotNull(event);
-        assertNull(event.getPayload());
+        assertNull(event.payload());
     }
 
     @Test
@@ -64,7 +64,7 @@ class EventTest {
         Event event1 = Event.create(1L, 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_UPDATE, 0L, "data1");
         Event event2 = Event.create(1L, 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_SNAPSHOT, 0L, "data2");
 
-        assertNotEquals(event1.getEventType(), event2.getEventType());
+        assertNotEquals(event1.eventType(), event2.eventType());
     }
 
     @Test
@@ -72,7 +72,7 @@ class EventTest {
         Event event1 = Event.create(1L, 1L, SourceId.FEED_HANDLER, EventType.HEARTBEAT, 0L, null);
         Event event2 = Event.create(1L, 1L, SourceId.ANALYTICS, EventType.HEARTBEAT, 0L, null);
 
-        assertEquals(event1.getEventType(), event2.getEventType());
-        assertNotEquals(event1.getSourceId(), event2.getSourceId());
+        assertEquals(event1.eventType(), event2.eventType());
+        assertNotEquals(event1.sourceId(), event2.sourceId());
     }
 }

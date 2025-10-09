@@ -32,7 +32,7 @@ public class InMemoryEventBus implements EventBus {
             return false;
         }
 
-        int eventType = event.getEventType();
+        int eventType = event.eventType();
         if (eventType < 0 || eventType >= handlers.length) {
             return false;
         }

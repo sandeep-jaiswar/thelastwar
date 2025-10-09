@@ -22,7 +22,7 @@ class EventHandlerTest {
     @Test
     void testHandlerCanAccessEventProperties() {
         AtomicInteger receivedEventType = new AtomicInteger(0);
-        EventHandler<String> handler = event -> receivedEventType.set(event.getEventType());
+        EventHandler<String> handler = event -> receivedEventType.set(event.eventType());
 
         Event event = Event.create(System.nanoTime(), 1L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L, "order data");
         handler.onEvent(event);

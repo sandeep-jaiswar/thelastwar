@@ -6,11 +6,13 @@ Proposed
 ## Context
 The Last War trading system requires a high-performance, low-latency event bus to decouple subsystems (Feed Handler, Matching Engine, Risk Manager, OMS, Analytics). The event bus must meet the following requirements:
 
-- **Ultra-low latency**: Publish/subscribe latency < 5 microseconds
+- **Ultra-low latency**: Publish/subscribe round-trip < 10 microseconds (per architecture targets)
 - **GC-neutral design**: Minimal garbage collection pressure to avoid latency spikes
-- **High throughput**: Support millions of events per second
-- **In-process communication**: All subsystems run in the same JVM
+- **High throughput**: Support > 2 million events per second (per architecture targets)
+- **In-process communication**: All subsystems run in the same JVM initially
 - **Reliability**: Message delivery guarantees
+- **Deterministic replay**: Event log as system-of-record for state recovery
+- **Mechanical sympathy**: CPU affinity, lock-free structures, off-heap support
 - **Simplicity**: Minimal operational overhead (embedded solution preferred)
 
 We evaluated three leading options for implementing the event bus abstraction:
@@ -21,11 +23,14 @@ We evaluated three leading options for implementing the event bus abstraction:
 
 ## Decision Drivers
 
-- **Latency**: Sub-5 microsecond requirement for hot path
+- **Latency**: Sub-10 microsecond requirement for hot path (per architecture)
+- **Throughput**: > 2 million msgs/sec (per architecture targets)
 - **GC pressure**: Zero allocation in publish hot path
+- **Deterministic replay**: Event log as system-of-record
 - **Operational complexity**: Prefer embedded, no external dependencies
-- **Persistence**: Optional for some use cases
+- **Persistence**: Required for replay and audit
 - **Maturity**: Production-ready with active community
+- **Mechanical sympathy**: CPU affinity, lock-free structures, NUMA-awareness
 - **Learning curve**: Team familiarity and ease of adoption
 
 ## Options Considered

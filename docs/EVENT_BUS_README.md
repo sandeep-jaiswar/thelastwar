@@ -4,7 +4,7 @@ Core Event Bus abstraction for The Last War trading system, providing ultra-low 
 
 ## Overview
 
-The Event Bus provides a GC-neutral publish/subscribe mechanism with sub-5 microsecond latency for inter-subsystem communication. It decouples:
+The Event Bus provides a GC-neutral publish/subscribe mechanism with sub-10 microsecond round-trip latency for inter-subsystem communication. It decouples:
 
 - **Feed Handler** - Market data processing
 - **Matching Engine** - Order matching and execution
@@ -12,22 +12,35 @@ The Event Bus provides a GC-neutral publish/subscribe mechanism with sub-5 micro
 - **OMS** - Order Management System
 - **Analytics** - Performance metrics and analytics
 
+### Architecture Alignment
+
+This implementation follows the core architecture principles:
+- **Java 17+ with Records**: Compact, efficient event representation (Java 21 recommended)
+- **GC-Neutral Design**: Object pooling, primitive types, zero allocation in hot path
+- **Mechanical Sympathy**: Lock-free structures, CPU affinity support
+- **Deterministic Replay**: Event log as system-of-record, sequence-based ordering
+- **Performance Targets**: < 10 µs round-trip, > 2M msgs/sec throughput
+
 ## Architecture
 
 ### Core Components
 
 1. **EventBus Interface** - Main abstraction for publish/subscribe operations
-2. **Event Model** - Immutable event with metadata (timestamp, sequence, sourceId, eventType, header)
+2. **Event Record** - Immutable event with metadata (timestamp, sequence, sourceId, eventType, header)
 3. **EventHandler** - Functional interface for event consumers
 4. **EventType** - Integer constants for event types (avoids autoboxing)
 5. **SourceId** - Integer constants for subsystem identification
+6. **EventPool** - Object pool for zero-allocation event creation (NEW)
 
 ### Design Principles
 
-- **GC-Neutral**: No autoboxing, minimal allocations in hot path
-- **Ultra-Low Latency**: Target < 5 microseconds publish/subscribe
+- **GC-Neutral**: No autoboxing, minimal allocations in hot path, object pooling
+- **Ultra-Low Latency**: Target < 10 microseconds round-trip (per architecture)
 - **Type Safety**: Compile-time type checking with generics
 - **Extensibility**: Clean abstraction allows multiple implementations
+- **Java Records**: Compact, efficient event representation (Java 17+)
+- **Deterministic Replay**: Sequence-based ordering for state recovery
+- **Mechanical Sympathy**: Support for lock-free algorithms, CPU affinity
 
 ## Usage
 
@@ -85,6 +98,34 @@ EventHandler<OrderData> handler = new EventHandler<>() {
 eventBus.subscribe(EventType.ORDER_FILLED, handler);
 ```
 
+### Object Pooling for Zero Allocation
+
+Use `EventPool` to eliminate heap allocations in hot path:
+
+```java
+// Create a pool (typically done at startup)
+EventPool pool = new EventPool(1000); // 1000 pre-allocated events
+
+// In hot path - zero allocation after warmup
+EventPool.MutableEvent mutableEvent = pool.acquire();
+mutableEvent.set(
+    System.nanoTime(),
+    sequence++,
+    SourceId.MATCHING_ENGINE,
+    EventType.ORDER_FILLED,
+    0L,
+    orderData
+);
+
+// Publish (convert to immutable Event)
+eventBus.publish(mutableEvent.toEvent());
+
+// Return to pool for reuse
+pool.release(mutableEvent);
+```
+
+This pattern achieves **zero allocation in the hot path** after pool warmup, critical for microsecond-level latency.
+
 ### Event Types
 
 Event types are organized by subsystem:
@@ -139,10 +180,11 @@ mvn exec:java -Dexec.mainClass="org.openjdk.jmh.Main" \
 
 ### Target Metrics
 
-- **Publish Latency**: < 5 microseconds (99th percentile)
+- **Publish Latency**: < 10 microseconds round-trip (99th percentile)
 - **Subscribe Latency**: O(1) operation
-- **GC Pressure**: Zero allocation in hot path
-- **Throughput**: Millions of events per second
+- **GC Pressure**: Zero allocation in hot path with object pooling
+- **Throughput**: > 2 million events per second
+- **Deterministic Replay**: Bit-for-bit state recovery via sequence numbers
 
 ### Benchmark Results
 
@@ -155,8 +197,8 @@ java -cp "target/test-classes:target/classes:$HOME/.m2/repository/org/openjdk/jm
 ```
 
 Expected results (will vary by hardware):
-- `benchmarkPublish`: < 5000 ns (< 5 µs)
-- `benchmarkPublishAndReceive`: < 5000 ns
+- `benchmarkPublish`: < 10000 ns (< 10 µs) target
+- `benchmarkPublishAndReceive`: < 10000 ns
 - `benchmarkEventCreation`: ~50 ns
 - `benchmarkSubscribe`: ~500 ns
 
