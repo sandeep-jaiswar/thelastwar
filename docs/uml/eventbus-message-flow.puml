@@ -1,0 +1,145 @@
+@startuml EventBus Message Flow
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam ArrowColor #333333
+
+title Event Bus Message Flow - The Last War Trading System
+
+box "Event Producers" #E8F4F8
+    participant "Feed Handler" as FH
+    participant "Matching Engine" as ME
+    participant "Risk Manager" as RM
+    participant "OMS" as OMS
+    participant "Analytics" as AN
+end box
+
+box "Core Infrastructure" #FFF4E6
+    participant "Event Bus" as EB
+    database "Event Queue" as EQ
+end box
+
+box "Event Consumers" #F0F8E8
+    participant "Handler 1" as H1
+    participant "Handler 2" as H2
+    participant "Handler N" as HN
+end box
+
+== Initialization Phase ==
+
+H1 -> EB: subscribe(EventType.MARKET_DATA_UPDATE, handler1)
+activate EB
+EB --> H1: Subscription
+deactivate EB
+
+H2 -> EB: subscribe(EventType.ORDER_FILLED, handler2)
+activate EB
+EB --> H2: Subscription
+deactivate EB
+
+HN -> EB: subscribe(EventType.RISK_CHECK_FAILED, handlerN)
+activate EB
+EB --> HN: Subscription
+deactivate EB
+
+== Event Publishing Flow ==
+
+FH -> FH: Create Event\n(timestamp, sequence, sourceId, eventType, header, payload)
+activate FH
+
+FH -> EB: publish(event)
+activate EB
+EB -> EQ: enqueue(event)
+activate EQ
+note right
+  GC-neutral enqueue
+  No allocation in hot path
+  Target: < 5µs latency
+end note
+EQ --> EB: success
+deactivate EQ
+EB --> FH: true
+deactivate EB
+deactivate FH
+
+== Event Dispatch Flow ==
+
+EQ -> EB: dequeue next event
+activate EB
+EB -> EB: lookup subscribers\nfor event.getEventType()
+note right
+  Fast lookup using
+  primitive int keys
+  (no autoboxing)
+end note
+
+alt Event Type = MARKET_DATA_UPDATE
+    EB -> H1: onEvent(event)
+    activate H1
+    H1 --> EB: 
+    deactivate H1
+end
+
+== Multiple Producers Concurrent Publishing ==
+
+ME -> EB: publish(orderFilledEvent)
+activate EB
+EB -> EQ: enqueue(orderFilledEvent)
+EQ --> EB: success
+EB --> ME: true
+deactivate EB
+
+RM -> EB: publish(riskCheckEvent)
+activate EB
+EB -> EQ: enqueue(riskCheckEvent)
+EQ --> EB: success
+EB --> RM: true
+deactivate EB
+
+== Event Processing with Error Handling ==
+
+EQ -> EB: dequeue orderFilledEvent
+EB -> H2: onEvent(orderFilledEvent)
+activate H2
+H2 -> H2: process event
+alt Processing Error
+    H2 --> EB: throws exception
+    EB -> H2: onError(event, exception)
+end
+deactivate H2
+
+== Unsubscribe Flow ==
+
+H1 -> EB: subscription.unsubscribe()
+activate EB
+EB -> EB: remove handler from subscribers
+EB --> H1: 
+deactivate EB
+
+== Shutdown Flow ==
+
+OMS -> EB: stop()
+activate EB
+EB -> EQ: drain remaining events
+activate EQ
+loop while events exist
+    EQ -> EB: dequeue event
+    EB -> H1: onEvent(event)
+    EB -> H2: onEvent(event)
+end
+EQ --> EB: empty
+deactivate EQ
+EB --> OMS: shutdown complete
+deactivate EB
+
+note over FH, HN
+  **Performance Characteristics:**
+  • Publish latency: < 5µs
+  • Subscribe/Unsubscribe: O(1) amortized
+  • Zero allocation in publish hot path
+  • No autoboxing (primitive int for eventType, sourceId)
+  • Lock-free or low-contention design
+end note
+
+@enduml
