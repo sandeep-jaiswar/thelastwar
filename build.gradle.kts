@@ -13,8 +13,7 @@ subprojects {
     
     java {
         toolchain {
-            // TODO: Upgrade to Java 21 as specified in architecture
-            languageVersion.set(JavaLanguageVersion.of(17))
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 }

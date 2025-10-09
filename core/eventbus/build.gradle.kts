@@ -8,9 +8,7 @@ version = "1.0.0-SNAPSHOT"
 
 java {
     toolchain {
-        // TODO: Upgrade to Java 21 as specified in architecture
-        // Currently using Java 17 due to environment constraints
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
