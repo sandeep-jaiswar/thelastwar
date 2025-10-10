@@ -1,9 +1,7 @@
-package com.thelastwar.matching.example;
+package com.thelastwar.matching;
 
 import com.thelastwar.eventbus.*;
 import com.thelastwar.eventbus.model.OrderEvent;
-import com.thelastwar.matching.CacheWarmingService;
-import com.thelastwar.matching.MatchingEngine;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 /**
@@ -142,94 +140,5 @@ public class CacheWarmingExample {
         System.out.println("  Total Hits:       " + metrics.totalHits());
         System.out.println("  Total Misses:     " + metrics.totalMisses());
         System.out.println("  Hit Ratio:        " + String.format("%.2f%%", metrics.hitRatio() * 100));
-    }
-    
-    /**
-     * Simple in-memory event bus for the example.
-     */
-    private static class InMemoryEventBus implements EventBus {
-        private final java.util.List<EventHandler<?>>[] handlers;
-        private final java.util.concurrent.atomic.AtomicLong publishedCount = 
-            new java.util.concurrent.atomic.AtomicLong(0);
-        private volatile boolean running;
-        
-        @SuppressWarnings("unchecked")
-        public InMemoryEventBus() {
-            this.handlers = new java.util.List[10000];
-            for (int i = 0; i < handlers.length; i++) {
-                handlers[i] = new java.util.concurrent.CopyOnWriteArrayList<>();
-            }
-        }
-        
-        @Override
-        public boolean publish(Event event) {
-            if (!running) return false;
-            
-            publishedCount.incrementAndGet();
-            
-            int eventType = event.eventType();
-            if (eventType < 0 || eventType >= handlers.length) {
-                return false;
-            }
-            
-            for (EventHandler<?> handler : handlers[eventType]) {
-                try {
-                    @SuppressWarnings("unchecked")
-                    EventHandler<Object> h = (EventHandler<Object>) handler;
-                    h.onEvent(event);
-                } catch (Exception e) {
-                    // Swallow exceptions
-                }
-            }
-            
-            return true;
-        }
-        
-        @Override
-        public Subscription subscribe(int eventType, EventHandler<?> handler) {
-            if (eventType < 0 || eventType >= handlers.length) {
-                throw new IllegalArgumentException("Invalid event type");
-            }
-            
-            handlers[eventType].add(handler);
-            
-            return new Subscription() {
-                private volatile boolean active = true;
-                
-                @Override
-                public void unsubscribe() {
-                    active = false;
-                    handlers[eventType].remove(handler);
-                }
-                
-                @Override
-                public boolean isActive() {
-                    return active;
-                }
-            };
-        }
-        
-        @Override
-        public long getPublishedEventCount() {
-            return publishedCount.get();
-        }
-        
-        @Override
-        public int getSubscriberCount(int eventType) {
-            if (eventType < 0 || eventType >= handlers.length) {
-                return 0;
-            }
-            return handlers[eventType].size();
-        }
-        
-        @Override
-        public void start() {
-            running = true;
-        }
-        
-        @Override
-        public void stop() {
-            running = false;
-        }
     }
 }
