@@ -8,7 +8,7 @@ version = "1.0.0-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -17,9 +17,13 @@ repositories {
 }
 
 dependencies {
+    // Aeron for ultra-low latency messaging
+    implementation("io.aeron:aeron-all:1.44.1")
+    
     // JUnit 5 for unit testing
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
     
     // JMH for microbenchmarking
     testImplementation("org.openjdk.jmh:jmh-core:1.37")
@@ -29,6 +33,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     maxHeapSize = "2g"
+    
+    // Add JVM args for Aeron to access internal Java modules
+    jvmArgs(
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util.zip=ALL-UNNAMED"
+    )
     
     testLogging {
         events("passed", "skipped", "failed")
@@ -50,5 +60,17 @@ tasks.register<JavaExec>("jmh") {
     description = "Run JMH benchmarks"
     classpath = sourceSets.test.get().runtimeClasspath
     mainClass.set("org.openjdk.jmh.Main")
-    args = listOf(".*EventBusBenchmark.*")
+    
+    // Add JVM args for Aeron
+    jvmArgs(
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util.zip=ALL-UNNAMED"
+    )
+    
+    // Default to all benchmarks, can be overridden with -Pargs="pattern"
+    args = if (project.hasProperty("args")) {
+        listOf(project.property("args").toString())
+    } else {
+        listOf(".*Benchmark.*")
+    }
 }

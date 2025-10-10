@@ -5,23 +5,23 @@ package com.thelastwar.eventbus;
  * Using integer constants for GC-neutral design.
  */
 public final class SourceId {
-    
+
     public static final int FEED_HANDLER = 1;
     public static final int MATCHING_ENGINE = 2;
     public static final int RISK_MANAGER = 3;
     public static final int OMS = 4;
     public static final int ANALYTICS = 5;
     public static final int SYSTEM = 99;
-    
+
     private SourceId() {
         // Utility class - prevent instantiation
     }
-    
+
     /**
      * Gets the name of a source.
      * 
      * @param sourceId The source identifier
-     * @return source name
+     * @return source name (never null)
      */
     public static String getName(int sourceId) {
         return switch (sourceId) {
