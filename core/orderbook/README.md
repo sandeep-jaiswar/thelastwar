@@ -9,8 +9,11 @@ High-performance in-memory limit order book with O(log n) insert and remove oper
 - **O(1) Order Lookup**: Fast order lookup by ID using HashMap
 - **Single-Threaded Design**: Optimized for single-writer principle (caller must synchronize)
 - **Allocation-Free Hot Path**: Minimal allocations after warm-up period
+- **Off-Heap State Store**: Optional memory-mapped persistence with < 2 µs latency ([OFF_HEAP_STORE.md](OFF_HEAP_STORE.md))
 
 ## Performance
+
+### Order Book Performance
 
 Based on JMH benchmarks on Java 25:
 
@@ -22,6 +25,20 @@ Based on JMH benchmarks on Java 25:
 | Get Best Bid/Ask | ~5 ns | < 1 µs |
 
 All operations meet the **< 1 µs p99 latency** requirement.
+
+### Off-Heap Store Performance
+
+Based on JMH benchmarks on Java 25:
+
+| Operation | Average Latency | Target |
+|-----------|----------------|--------|
+| Get | 0.013 µs (13 ns) | < 2 µs |
+| Put | 0.671 µs (671 ns) | < 2 µs |
+| Update | 0.054 µs (54 ns) | < 2 µs |
+
+All operations meet the **< 2 µs latency** requirement. ✅
+
+See [OFF_HEAP_STORE.md](OFF_HEAP_STORE.md) for detailed documentation.
 
 ## Architecture
 

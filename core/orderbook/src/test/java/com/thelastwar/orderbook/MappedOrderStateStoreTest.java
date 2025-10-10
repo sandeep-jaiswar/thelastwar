@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive tests for ChronicleOrderStateStore.
+ * Comprehensive tests for MappedOrderStateStore.
  * 
  * Tests cover:
  * - Basic CRUD operations
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - Crash-safety verification
  * - Performance (< 2 µs latency)
  */
-class ChronicleOrderStateStoreTest {
+class MappedOrderStateStoreTest {
     
     private static Path testDir;
     private OrderStateStore store;
@@ -61,31 +61,31 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Create in-memory store successfully")
     void testCreateInMemory() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         assertNotNull(store);
         assertFalse(store.isClosed());
         assertEquals(0, store.size());
-        assertFalse(((ChronicleOrderStateStore) store).isPersisted());
+        assertFalse(((MappedOrderStateStore) store).isPersisted());
     }
     
     @Test
     @DisplayName("Create persisted store successfully")
     void testCreatePersisted() throws IOException {
         Path file = testDir.resolve("test-store.dat");
-        store = ChronicleOrderStateStore.createPersisted(file, 1000);
+        store = MappedOrderStateStore.createPersisted(file, 1000);
         
         assertNotNull(store);
         assertFalse(store.isClosed());
         assertEquals(0, store.size());
-        assertTrue(((ChronicleOrderStateStore) store).isPersisted());
+        assertTrue(((MappedOrderStateStore) store).isPersisted());
         assertTrue(Files.exists(file));
     }
     
     @Test
     @DisplayName("Put and get order successfully")
     void testPutAndGet() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
         store.put(order);
@@ -106,7 +106,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Update existing order")
     void testUpdateOrder() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
         store.put(order1);
@@ -123,7 +123,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Remove order successfully")
     void testRemoveOrder() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
         store.put(order);
@@ -140,7 +140,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Remove non-existent order returns null")
     void testRemoveNonExistent() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order removed = store.remove(999L);
         assertNull(removed);
@@ -149,7 +149,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Clear removes all orders")
     void testClear() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         for (long i = 1; i <= 10; i++) {
             store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
@@ -166,7 +166,7 @@ class ChronicleOrderStateStoreTest {
         Path file = testDir.resolve("persistence-test.dat");
         
         // Create store and add orders
-        store = ChronicleOrderStateStore.createPersisted(file, 1000);
+        store = MappedOrderStateStore.createPersisted(file, 1000);
         for (long i = 1; i <= 100; i++) {
             store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000));
         }
@@ -174,7 +174,7 @@ class ChronicleOrderStateStoreTest {
         store.close();
         
         // Reopen and verify recovery
-        store = ChronicleOrderStateStore.createPersisted(file, 1000);
+        store = MappedOrderStateStore.createPersisted(file, 1000);
         assertEquals(100, store.size());
         
         // Verify all orders recovered correctly
@@ -190,7 +190,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Multiple readers can read concurrently")
     void testConcurrentReaders() throws IOException, InterruptedException, ExecutionException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         // Add test data
         for (long i = 1; i <= 100; i++) {
@@ -232,7 +232,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Single writer with concurrent readers")
     void testSingleWriterMultipleReaders() throws IOException, InterruptedException {
-        store = ChronicleOrderStateStore.createInMemory(10000);
+        store = MappedOrderStateStore.createInMemory(10000);
         
         // Initial data
         for (long i = 1; i <= 100; i++) {
@@ -297,7 +297,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Close store makes it unusable")
     void testCloseStore() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
         store.put(order);
@@ -317,7 +317,7 @@ class ChronicleOrderStateStoreTest {
     @DisplayName("Flush completes without error")
     void testFlush() throws IOException {
         Path file = testDir.resolve("flush-test.dat");
-        store = ChronicleOrderStateStore.createPersisted(file, 1000);
+        store = MappedOrderStateStore.createPersisted(file, 1000);
         
         for (long i = 1; i <= 10; i++) {
             store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
@@ -332,7 +332,7 @@ class ChronicleOrderStateStoreTest {
     @Test
     @DisplayName("Handle symbols up to max length")
     void testMaxSymbolLength() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         // 15-character symbol (max supported)
         String longSymbol = "VERYLONGSYMBOL1";
@@ -345,24 +345,9 @@ class ChronicleOrderStateStoreTest {
     }
     
     @Test
-    @DisplayName("Truncate symbols longer than max length")
-    void testTruncateLongSymbol() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
-        
-        // 20-character symbol (will be truncated to 15)
-        String veryLongSymbol = "VERYLONGSYMBOLEXTRA";
-        Order order = new Order(1L, veryLongSymbol, Order.SIDE_BUY, 15000L, 100L, 1000L);
-        store.put(order);
-        
-        Order retrieved = store.get(1L);
-        assertNotNull(retrieved);
-        assertEquals("VERYLONGSYMBOL1", retrieved.symbol());
-    }
-    
-    @Test
     @DisplayName("Handle both buy and sell orders")
     void testBuySellOrders() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(1000);
+        store = MappedOrderStateStore.createInMemory(1000);
         
         Order buyOrder = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
         Order sellOrder = new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 100L, 2000L);

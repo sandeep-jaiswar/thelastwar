@@ -1,6 +1,6 @@
 package com.thelastwar.orderbook.benchmark;
 
-import com.thelastwar.orderbook.ChronicleOrderStateStore;
+import com.thelastwar.orderbook.MappedOrderStateStore;
 import com.thelastwar.orderbook.Order;
 import com.thelastwar.orderbook.OrderStateStore;
 import org.openjdk.jmh.annotations.*;
@@ -10,14 +10,14 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * JMH benchmark for ChronicleOrderStateStore performance.
+ * JMH benchmark for MappedOrderStateStore performance.
  * 
  * Verifies acceptance criteria:
  * - Read latency < 2 µs
  * - Write latency < 2 µs
  * 
  * Run with:
- * ./gradlew :core:orderbook:jmh -Pargs="ChronicleOrderStateStoreBenchmark"
+ * ./gradlew :core:orderbook:jmh -Pargs="MappedOrderStateStoreBenchmark"
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(1)
-public class ChronicleOrderStateStoreBenchmark {
+public class MappedOrderStateStoreBenchmark {
     
     private OrderStateStore store;
     private Order testOrder;
@@ -33,7 +33,7 @@ public class ChronicleOrderStateStoreBenchmark {
     
     @Setup(Level.Trial)
     public void setup() throws IOException {
-        store = ChronicleOrderStateStore.createInMemory(100000);
+        store = MappedOrderStateStore.createInMemory(100000);
         
         // Pre-populate with test data
         for (long i = 1; i <= 10000; i++) {
