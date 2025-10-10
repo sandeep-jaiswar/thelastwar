@@ -4,6 +4,8 @@ import com.thelastwar.eventbus.*;
 import com.thelastwar.eventbus.model.*;
 import com.thelastwar.orderbook.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -348,6 +350,81 @@ public class MatchingEngine {
             tradeIdCounter.get(),
             sequenceTracker.get()
         );
+    }
+    
+    /**
+     * Creates a snapshot of the entire matching engine state.
+     * This includes all order books and internal counters.
+     * 
+     * @return MatchingEngineSnapshot for state recovery
+     */
+    public MatchingEngineSnapshot createSnapshot() {
+        Map<String, LimitOrderBook.OrderBookSnapshot> bookSnapshots = new HashMap<>();
+        
+        for (Map.Entry<String, LimitOrderBook> entry : books.entrySet()) {
+            bookSnapshots.put(entry.getKey(), entry.getValue().createSnapshot());
+        }
+        
+        return new MatchingEngineSnapshot(
+            bookSnapshots,
+            executionIdCounter.get(),
+            tradeIdCounter.get(),
+            sequenceTracker.get()
+        );
+    }
+    
+    /**
+     * Restores the matching engine state from a snapshot.
+     * This clears current state and rebuilds from the snapshot.
+     * 
+     * @param snapshot Snapshot to restore from
+     */
+    public void restoreFromSnapshot(MatchingEngineSnapshot snapshot) {
+        // Clear current state
+        books.clear();
+        
+        // Restore order books
+        for (Map.Entry<String, LimitOrderBook.OrderBookSnapshot> entry : snapshot.bookSnapshots().entrySet()) {
+            String symbol = entry.getKey();
+            LimitOrderBook book = new LimitOrderBook(symbol);
+            book.restoreFromSnapshot(entry.getValue());
+            books.put(symbol, book);
+        }
+        
+        // Restore counters
+        executionIdCounter.set(snapshot.executionIdCounter());
+        tradeIdCounter.set(snapshot.tradeIdCounter());
+        sequenceTracker.set(snapshot.sequenceTracker());
+    }
+    
+    /**
+     * Immutable snapshot of matching engine state for recovery.
+     * 
+     * @param bookSnapshots Map of symbol to order book snapshots
+     * @param executionIdCounter Last execution ID
+     * @param tradeIdCounter Last trade ID
+     * @param sequenceTracker Last sequence number
+     */
+    public record MatchingEngineSnapshot(
+        Map<String, LimitOrderBook.OrderBookSnapshot> bookSnapshots,
+        long executionIdCounter,
+        long tradeIdCounter,
+        long sequenceTracker
+    ) {
+        public MatchingEngineSnapshot {
+            // Defensive copy to ensure immutability
+            bookSnapshots = new HashMap<>(bookSnapshots);
+        }
+        
+        /**
+         * Gets an immutable copy of the book snapshots.
+         * 
+         * @return Map of book snapshots
+         */
+        @Override
+        public Map<String, LimitOrderBook.OrderBookSnapshot> bookSnapshots() {
+            return new HashMap<>(bookSnapshots);
+        }
     }
     
     /**

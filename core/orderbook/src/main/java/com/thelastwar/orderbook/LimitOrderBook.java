@@ -258,4 +258,60 @@ public class LimitOrderBook {
     public String getSymbol() {
         return symbol;
     }
+    
+    /**
+     * Creates a snapshot of the current order book state.
+     * This captures all orders at the current point in time for recovery.
+     * 
+     * @return OrderBookSnapshot representing the current state
+     */
+    public OrderBookSnapshot createSnapshot() {
+        List<Order> allOrders = new ArrayList<>(orderMap.values());
+        return new OrderBookSnapshot(symbol, allOrders);
+    }
+    
+    /**
+     * Restores the order book state from a snapshot.
+     * This clears the current state and rebuilds from the snapshot.
+     * 
+     * @param snapshot Snapshot to restore from
+     * @throws IllegalArgumentException if snapshot symbol doesn't match
+     */
+    public void restoreFromSnapshot(OrderBookSnapshot snapshot) {
+        if (!symbol.equals(snapshot.symbol())) {
+            throw new IllegalArgumentException(
+                "Snapshot symbol " + snapshot.symbol() + " doesn't match book symbol " + symbol);
+        }
+        
+        // Clear current state
+        clear();
+        
+        // Rebuild from snapshot orders
+        for (Order order : snapshot.orders()) {
+            addOrder(order);
+        }
+    }
+    
+    /**
+     * Immutable snapshot of order book state for recovery.
+     * 
+     * @param symbol Symbol of the order book
+     * @param orders List of all orders in the book at snapshot time
+     */
+    public record OrderBookSnapshot(String symbol, List<Order> orders) {
+        public OrderBookSnapshot {
+            // Defensive copy to ensure immutability
+            orders = new ArrayList<>(orders);
+        }
+        
+        /**
+         * Gets an immutable copy of the orders.
+         * 
+         * @return List of orders
+         */
+        @Override
+        public List<Order> orders() {
+            return new ArrayList<>(orders);
+        }
+    }
 }
