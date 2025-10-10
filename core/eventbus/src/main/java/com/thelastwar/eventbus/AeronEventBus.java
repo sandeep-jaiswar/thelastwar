@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Aeron-backed implementation of EventBus optimized for ultra-low latency and
@@ -41,7 +43,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * - Fragment assembler for handling multi-fragment messages
  * - Back-off idle strategy for CPU-friendly polling
  */
-public class AeronEventBus implements EventBus {
+public class AeronEventBus implements EventBus, AutoCloseable {
+
+    private static final Logger LOGGER = Logger.getLogger(AeronEventBus.class.getName());
 
     // Aeron configuration constants
     private static final String CHANNEL = "aeron:ipc";
@@ -50,6 +54,18 @@ public class AeronEventBus implements EventBus {
                                                    // throughput)
 
     private static final int MAX_MESSAGE_SIZE = 4096; // 4KB max message
+
+    // Configuration constants
+    private static final int MAX_EVENT_TYPES = 10000; // Maximum supported event types
+    private static final int TERM_BUFFER_LENGTH = 1024 * 1024; // 1MB term buffer
+    private static final int IPC_MTU_LENGTH = 1408; // Optimized MTU for IPC transport
+    private static final int THREAD_JOIN_TIMEOUT_MS = 5000; // 5 seconds timeout for thread join
+
+    // Idle strategy constants
+    private static final int IDLE_MAX_SPINS = 100;
+    private static final int IDLE_MAX_YIELDS = 10;
+    private static final int IDLE_MIN_PARK_PERIOD_NS = 1_000; // 1 microsecond
+    private static final int IDLE_MAX_PARK_PERIOD_NS = 1_000_000; // 1 millisecond
 
     // Performance tuning constants (for future optimization)
     // Term buffer sizes: Current 1MB, can increase to 2-4MB for higher throughput
@@ -69,8 +85,7 @@ public class AeronEventBus implements EventBus {
     // Polling thread for subscribers
     private Thread pollingThread;
     private final IdleStrategy idleStrategy = new BackoffIdleStrategy(
-            100, 10, 1_000, 1_000_000 // maxSpins, maxYields, minParkPeriodNs, maxParkPeriodNs
-    );
+            IDLE_MAX_SPINS, IDLE_MAX_YIELDS, IDLE_MIN_PARK_PERIOD_NS, IDLE_MAX_PARK_PERIOD_NS);
 
     // Pre-allocated buffer for zero-allocation publishing (thread-local for safety)
     private final ThreadLocal<UnsafeBuffer> offerBuffer = ThreadLocal.withInitial(
@@ -103,7 +118,8 @@ public class AeronEventBus implements EventBus {
         this.aeronSubscription = aeron.addSubscription(CHANNEL, STREAM_ID);
 
         // Pre-allocate handler arrays for all possible event types
-        this.handlers = new List[10000];
+        final List<HandlerRegistration>[] handlerArray = new List[MAX_EVENT_TYPES];
+        this.handlers = handlerArray;
         for (int i = 0; i < handlers.length; i++) {
             handlers[i] = new CopyOnWriteArrayList<>();
         }
@@ -118,10 +134,10 @@ public class AeronEventBus implements EventBus {
                 .dirDeleteOnStart(true)
                 .dirDeleteOnShutdown(true)
                 .termBufferSparseFile(false) // Pre-allocate for consistent performance
-                .publicationTermBufferLength(1024 * 1024) // 1MB term buffer
-                .ipcTermBufferLength(1024 * 1024) // 1MB IPC term buffer
-                .mtuLength(1408) // Optimized for IPC
-                .ipcPublicationTermWindowLength(1024 * 1024); // Match term buffer
+                .publicationTermBufferLength(TERM_BUFFER_LENGTH) // 1MB term buffer
+                .ipcTermBufferLength(TERM_BUFFER_LENGTH) // 1MB IPC term buffer
+                .mtuLength(IPC_MTU_LENGTH) // Optimized for IPC
+                .ipcPublicationTermWindowLength(TERM_BUFFER_LENGTH); // Match term buffer
 
         return MediaDriver.launchEmbedded(ctx);
     }
@@ -186,7 +202,7 @@ public class AeronEventBus implements EventBus {
         buffer.putLong(offset, event.header());
         offset += 8;
 
-        // Serialize payload using UTF-8 encoding
+        // Serialize payload using UTF-8 encoding with null safety
         String payload = event.payload() != null ? event.payload().toString() : "";
         byte[] payloadBytes = payload.getBytes(StandardCharsets.UTF_8);
 
@@ -230,7 +246,7 @@ public class AeronEventBus implements EventBus {
         int payloadLength = buffer.getInt(pos);
         pos += 4;
 
-        // Validate payload length
+        // Validate payload length to prevent buffer overflow attacks
         if (payloadLength < 0 || payloadLength > MAX_MESSAGE_SIZE) {
             throw new IllegalArgumentException("Invalid payload length: " + payloadLength);
         }
@@ -240,6 +256,7 @@ public class AeronEventBus implements EventBus {
 
         String payload = new String(payloadBytes, StandardCharsets.UTF_8);
 
+        // Event.create now validates parameters, so this is safe
         return Event.create(timestamp, sequence, sourceId, eventType, header, payload);
     }
 
@@ -252,7 +269,7 @@ public class AeronEventBus implements EventBus {
             throw new IllegalArgumentException("Handler cannot be null");
         }
 
-        HandlerRegistration registration = new HandlerRegistration(eventType, handler);
+        HandlerRegistration registration = new HandlerRegistration(handler);
         handlers[eventType].add(registration);
 
         return new Subscription() {
@@ -334,26 +351,32 @@ public class AeronEventBus implements EventBus {
                     try {
                         registration.handler.onError(event, e);
                     } catch (Exception errorHandlerException) {
-                        // Error handler itself threw an exception - ignore to prevent cascading
-                        // failures
-                        // In production, this should be logged to a monitoring system
+                        // Error handler itself threw an exception - log and continue to prevent
+                        // cascading failures
+                        LOGGER.log(Level.WARNING, "Error handler threw exception for event type: " + event.eventType(),
+                                errorHandlerException);
                     }
                 }
             }
         } catch (Exception e) {
-            // Deserialization or other unexpected error - continue processing to maintain
-            // system stability
-            // In production, this should be logged and monitored for debugging
+            // Deserialization or other unexpected error - log and continue processing to
+            // maintain system stability
+            LOGGER.log(Level.WARNING, "Failed to process fragment from Aeron subscription", e);
         }
     }
 
     @Override
     public void stop() {
+        close();
+    }
+
+    @Override
+    public void close() {
         if (running.compareAndSet(true, false)) {
             // Stop polling thread
             if (pollingThread != null) {
                 try {
-                    pollingThread.join(5000);
+                    pollingThread.join(THREAD_JOIN_TIMEOUT_MS);
                     if (pollingThread.isAlive()) {
                         pollingThread.interrupt();
                     }
@@ -368,7 +391,7 @@ public class AeronEventBus implements EventBus {
                     publication.close();
                 }
             } catch (Exception e) {
-                // Log but continue cleanup
+                LOGGER.log(Level.WARNING, "Failed to close Aeron publication", e);
             }
 
             try {
@@ -376,7 +399,7 @@ public class AeronEventBus implements EventBus {
                     aeronSubscription.close();
                 }
             } catch (Exception e) {
-                // Log but continue cleanup
+                LOGGER.log(Level.WARNING, "Failed to close Aeron subscription", e);
             }
 
             try {
@@ -384,7 +407,7 @@ public class AeronEventBus implements EventBus {
                     aeron.close();
                 }
             } catch (Exception e) {
-                // Log but continue cleanup
+                LOGGER.log(Level.WARNING, "Failed to close Aeron client", e);
             }
 
             try {
@@ -392,7 +415,7 @@ public class AeronEventBus implements EventBus {
                     mediaDriver.close();
                 }
             } catch (Exception e) {
-                // Log but continue cleanup
+                LOGGER.log(Level.WARNING, "Failed to close MediaDriver", e);
             }
 
             // Clean up thread-local buffers
@@ -406,7 +429,7 @@ public class AeronEventBus implements EventBus {
     private static class HandlerRegistration {
         final EventHandler<?> handler;
 
-        HandlerRegistration(int eventType, EventHandler<?> handler) {
+        HandlerRegistration(EventHandler<?> handler) {
             this.handler = handler;
         }
     }

@@ -4,7 +4,7 @@
 
 ### System Requirements
 
-- **Java**: 21+ (OpenJDK or similar)
+- **Java**: 25+ (OpenJDK or similar)
 - **Memory**: 2GB+ heap, 500MB+ direct memory
 - **CPU**: 2+ cores recommended
 - **OS**: Linux (best), macOS, Windows

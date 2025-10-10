@@ -15,7 +15,7 @@ The Event Bus provides a GC-neutral publish/subscribe mechanism with sub-10 micr
 ### Architecture Alignment
 
 This implementation follows the core architecture principles:
-- **Java 21 Target**: Using Java 17+ Records (targeting Java 21 as per architecture)
+- **Java 25 Target**: Using Java 17+ Records (targeting Java 25 as per architecture)
 - **GC-Neutral Design**: Object pooling, primitive types, zero allocation in hot path
 - **Mechanical Sympathy**: Lock-free structures, CPU affinity support
 - **Deterministic Replay**: Event log as system-of-record, sequence-based ordering

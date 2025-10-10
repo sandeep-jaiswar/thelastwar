@@ -8,7 +8,7 @@ version = "1.0.0-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
@@ -23,6 +23,7 @@ dependencies {
     // JUnit 5 for unit testing
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
     
     // JMH for microbenchmarking
     testImplementation("org.openjdk.jmh:jmh-core:1.37")

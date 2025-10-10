@@ -35,7 +35,7 @@ The architecture is **event-driven, memory-resident, and horizontally sharded**,
 ## ⚙️ Technology Stack
 
 ### Language & Runtime
-- **Java 21** (primary language)
+- **Java 25** (primary language)
 - **Kotlin** (utility & DSL modules)
 - **JMH / Chronicle Benchmark** (micro-benchmarks)
 
@@ -86,7 +86,7 @@ Deterministic replay: event log acts as system-of-record.
 
 Coding Standards
 
-Java 21 with strict compiler flags (-Xlint:all -Werror).
+Java 25 with strict compiler flags (-Xlint:all -Werror).
 
 Static analysis via PMD, SpotBugs, and ErrorProne.
 
@@ -143,7 +143,7 @@ multi-asset-trading-platform/
 🧭 Local Setup
 Prerequisites
 
-JDK 21+
+JDK 25+
 
 Docker & Docker Compose
 

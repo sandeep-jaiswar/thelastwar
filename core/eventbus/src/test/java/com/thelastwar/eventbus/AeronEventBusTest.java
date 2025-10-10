@@ -16,6 +16,13 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class AeronEventBusTest {
 
+    // Test configuration constants
+    private static final int INITIALIZATION_WAIT_MS = 100;
+    private static final int PROCESSING_WAIT_MS = 200;
+    private static final int HIGH_THROUGHPUT_EVENT_COUNT = 10000;
+    private static final int MAX_PROCESSING_TIME_MS = 5000;
+    private static final int INVALID_EVENT_TYPE = 10000;
+
     private AeronEventBus eventBus;
 
     @BeforeEach
@@ -24,7 +31,7 @@ class AeronEventBusTest {
         eventBus.start();
         // Give Aeron time to initialize
         try {
-            Thread.sleep(100);
+            Thread.sleep(INITIALIZATION_WAIT_MS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -161,7 +168,7 @@ class AeronEventBusTest {
                 0L,
                 "Event 1"));
 
-        Thread.sleep(200); // Wait for processing
+        Thread.sleep(PROCESSING_WAIT_MS); // Wait for processing
 
         // Unsubscribe
         subscription.unsubscribe();
@@ -176,7 +183,7 @@ class AeronEventBusTest {
                 0L,
                 "Event 2"));
 
-        Thread.sleep(200); // Wait for processing
+        Thread.sleep(PROCESSING_WAIT_MS); // Wait for processing
 
         // Should only have received first event
         assertEquals(1, count.get());
@@ -184,7 +191,7 @@ class AeronEventBusTest {
 
     @Test
     void testHighThroughput() throws InterruptedException {
-        final int eventCount = 10000;
+        final int eventCount = HIGH_THROUGHPUT_EVENT_COUNT;
         CountDownLatch latch = new CountDownLatch(eventCount);
 
         // Subscribe
@@ -215,7 +222,7 @@ class AeronEventBusTest {
 
         // Should be reasonably fast (this is a basic sanity check, not the full
         // benchmark)
-        assertTrue(durationMs < 5000, "Should process events in reasonable time");
+        assertTrue(durationMs < MAX_PROCESSING_TIME_MS, "Should process events in reasonable time");
     }
 
     @Test
@@ -231,7 +238,7 @@ class AeronEventBusTest {
                     "Event " + i));
         }
 
-        Thread.sleep(100); // Allow processing
+        Thread.sleep(INITIALIZATION_WAIT_MS); // Allow processing
 
         assertEquals(5, eventBus.getPublishedEventCount());
     }
@@ -257,7 +264,7 @@ class AeronEventBusTest {
         });
 
         assertThrows(IllegalArgumentException.class, () -> {
-            eventBus.subscribe(10000, event -> {
+            eventBus.subscribe(INVALID_EVENT_TYPE, event -> {
             });
         });
     }

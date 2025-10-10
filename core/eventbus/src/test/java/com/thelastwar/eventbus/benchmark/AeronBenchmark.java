@@ -35,6 +35,11 @@ import java.util.concurrent.TimeUnit;
 })
 public class AeronBenchmark {
 
+    // Benchmark configuration constants
+    private static final int AERON_INIT_WAIT_MS = 200;
+    private static final int PAYLOAD_SIZE_BYTES = 128;
+    private static final long SPIN_WAIT_MAX_NS = 100_000; // 100 microseconds
+
     @State(Scope.Thread)
     public static class BenchmarkState {
         AeronEventBus eventBus;
@@ -49,7 +54,7 @@ public class AeronBenchmark {
             eventBus.start();
 
             // Wait for Aeron to initialize
-            Thread.sleep(200);
+            Thread.sleep(AERON_INIT_WAIT_MS);
 
             // Subscribe a simple handler
             eventBus.subscribe(EventType.MARKET_DATA_UPDATE, e -> eventReceived = true);
@@ -65,7 +70,7 @@ public class AeronBenchmark {
 
             // Create 128-byte payload event (exactly 128 ASCII characters)
             StringBuilder payload = new StringBuilder();
-            for (int i = 0; i < 128; i++) {
+            for (int i = 0; i < PAYLOAD_SIZE_BYTES; i++) {
                 payload.append("x");
             }
             smallEvent128B = Event.create(
@@ -126,7 +131,7 @@ public class AeronBenchmark {
 
         // Spin-wait for event (more accurate than sleep)
         long spinStart = System.nanoTime();
-        while (!state.eventReceived && (System.nanoTime() - spinStart) < 100_000) {
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
             Thread.onSpinWait();
         }
 

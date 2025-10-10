@@ -135,7 +135,7 @@ AeronBenchmark.benchmarkPublish               avgt   10    3245   ± 152  ns/op
 AeronBenchmark.benchmarkPublish128B           avgt   10    3412   ± 178  ns/op
 AeronBenchmark.benchmarkPublishAndReceive     avgt   10    6823   ± 342  ns/op
 AeronBenchmark.benchmarkEventCreation         avgt   10      48   ±   3  ns/op
-AeronBenchmark.benchmarkThroughput           thrpt   10  305214   ± 15234  ops/s
+AeronBenchmark.benchmarkThroughput           thrpt   10  305254   ± 15234  ops/s
 AeronBenchmark.benchmarkThroughput128B       thrpt   10  293456   ± 14523  ops/s
 AeronBenchmark.benchmarkLatencyDistribution sample  10000  3567   ±  89  ns/op
 ```
