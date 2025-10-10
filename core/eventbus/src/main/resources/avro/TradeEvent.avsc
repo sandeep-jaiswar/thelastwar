@@ -1,0 +1,63 @@
+{
+  "type": "record",
+  "name": "TradeEvent",
+  "namespace": "com.thelastwar.eventbus.model",
+  "doc": "Immutable Trade Event record representing a completed trade transaction.",
+  "fields": [
+    {
+      "name": "tradeId",
+      "type": "long",
+      "doc": "Unique trade identifier"
+    },
+    {
+      "name": "orderId",
+      "type": "long",
+      "doc": "Associated order identifier"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol/instrument"
+    },
+    {
+      "name": "side",
+      "type": "int",
+      "doc": "Trade side: 1=Buy, 2=Sell"
+    },
+    {
+      "name": "quantity",
+      "type": "long",
+      "doc": "Trade quantity (executed)"
+    },
+    {
+      "name": "price",
+      "type": "long",
+      "doc": "Execution price (in minimum price increments)"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Trade timestamp in nanoseconds"
+    },
+    {
+      "name": "account",
+      "type": "long",
+      "doc": "Trading account identifier"
+    },
+    {
+      "name": "exchange",
+      "type": "int",
+      "doc": "Exchange identifier"
+    },
+    {
+      "name": "counterparty",
+      "type": "long",
+      "doc": "Counterparty identifier (0 if not applicable)"
+    },
+    {
+      "name": "fees",
+      "type": "long",
+      "doc": "Trade fees/commissions (in minimum currency units)"
+    }
+  ]
+}
