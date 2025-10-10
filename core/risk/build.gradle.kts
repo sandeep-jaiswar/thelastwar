@@ -5,8 +5,6 @@ plugins {
 dependencies {
     // Internal dependencies
     api(project(":core:eventbus"))
-    api(project(":core:orderbook"))
-    api(project(":core:risk"))
     
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")

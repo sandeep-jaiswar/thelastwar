@@ -3,6 +3,7 @@ package com.thelastwar.matching;
 import com.thelastwar.eventbus.*;
 import com.thelastwar.eventbus.model.*;
 import com.thelastwar.orderbook.*;
+import com.thelastwar.risk.*;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,19 +36,44 @@ public class MatchingEngine {
     private final AtomicLong tradeIdCounter;
     private final AtomicLong sequenceTracker;
     private volatile boolean running;
+    private final RiskValidator riskValidator;
     
     /**
-     * Creates a new matching engine.
+     * Creates a new matching engine with default risk validation.
      * 
      * @param eventBus Event bus for publishing/subscribing events
      */
     public MatchingEngine(EventBus eventBus) {
+        this(eventBus, createDefaultRiskValidator());
+    }
+    
+    /**
+     * Creates a new matching engine with custom risk validation.
+     * 
+     * @param eventBus      Event bus for publishing/subscribing events
+     * @param riskValidator Risk validator for pre-trade checks
+     */
+    public MatchingEngine(EventBus eventBus, RiskValidator riskValidator) {
         this.eventBus = eventBus;
         this.books = new ConcurrentHashMap<>();
         this.executionIdCounter = new AtomicLong(0);
         this.tradeIdCounter = new AtomicLong(0);
         this.sequenceTracker = new AtomicLong(0);
         this.running = false;
+        this.riskValidator = riskValidator;
+    }
+    
+    /**
+     * Creates default risk validator with standard modules.
+     * 
+     * @return Composite risk validator with credit, margin, and fat-finger checks
+     */
+    private static RiskValidator createDefaultRiskValidator() {
+        return new CompositeRiskValidator.Builder()
+            .add(new CreditCheckModule())
+            .add(new MarginCheckModule())
+            .add(new FatFingerCheckModule())
+            .build();
     }
     
     /**
@@ -112,8 +138,42 @@ public class MatchingEngine {
         // Track sequence for deterministic replay
         long sequence = sequenceTracker.incrementAndGet();
         
-        // Process the order
+        // Pre-trade risk validation (inline, synchronous)
+        RiskDecision riskDecision = riskValidator.validate(orderEvent);
+        
+        if (!riskDecision.approved()) {
+            // Reject order and publish rejection event
+            rejectOrder(orderEvent, riskDecision.reasonCode());
+            return;
+        }
+        
+        // Process the order if risk check passed
         processOrder(orderEvent, event.timestamp());
+    }
+    
+    /**
+     * Rejects an order and publishes rejection event.
+     * 
+     * @param orderEvent Order to reject
+     * @param reasonCode Rejection reason code
+     */
+    private void rejectOrder(OrderEvent orderEvent, int reasonCode) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create rejection execution
+        ExecutionEvent rejection = ExecutionEvent.reject(executionId, orderEvent, reasonCode);
+        
+        // Publish rejection event
+        Event rejectionEvent = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_REJECTED,
+            0L,
+            rejection
+        );
+        eventBus.publish(rejectionEvent);
     }
     
     /**
