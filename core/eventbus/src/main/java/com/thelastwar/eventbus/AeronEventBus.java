@@ -93,6 +93,7 @@ public class AeronEventBus implements EventBus, AutoCloseable {
 
     /**
      * Creates a new AeronEventBus with optimized configuration.
+     * This constructor uses an embedded MediaDriver with default optimized settings.
      */
     public AeronEventBus() {
         this(createOptimizedMediaDriver());
@@ -101,8 +102,10 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     /**
      * Creates a new AeronEventBus with custom MediaDriver.
      * Useful for testing or custom configurations.
+     * 
+     * @param mediaDriver the custom MediaDriver to use
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"}) // Generic array creation is required here
     public AeronEventBus(MediaDriver mediaDriver) {
         this.mediaDriver = mediaDriver;
 
@@ -118,8 +121,8 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         this.aeronSubscription = aeron.addSubscription(CHANNEL, STREAM_ID);
 
         // Pre-allocate handler arrays for all possible event types
-        final List<HandlerRegistration>[] handlerArray = new List[MAX_EVENT_TYPES];
-        this.handlers = handlerArray;
+        // Generic array creation is necessary here; suppressing warnings
+        this.handlers = (List<HandlerRegistration>[]) new List[MAX_EVENT_TYPES];
         for (int i = 0; i < handlers.length; i++) {
             handlers[i] = new CopyOnWriteArrayList<>();
         }
@@ -127,6 +130,8 @@ public class AeronEventBus implements EventBus, AutoCloseable {
 
     /**
      * Creates an optimized MediaDriver for ultra-low latency.
+     * 
+     * @return a configured MediaDriver instance optimized for IPC transport
      */
     private static MediaDriver createOptimizedMediaDriver() {
         final MediaDriver.Context ctx = new MediaDriver.Context()
@@ -142,6 +147,14 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         return MediaDriver.launchEmbedded(ctx);
     }
 
+    /**
+     * Publishes an event to all subscribed handlers.
+     * This method is thread-safe and uses thread-local buffers for zero-allocation publishing.
+     * 
+     * @param event the event to publish (must not be null)
+     * @return true if the event was successfully published, false if back pressure or not running
+     * @throws IllegalArgumentException if event is null or too large
+     */
     @Override
     public boolean publish(Event event) {
         if (!running.get()) {
@@ -180,8 +193,12 @@ public class AeronEventBus implements EventBus, AutoCloseable {
 
     /**
      * Serializes an event into the buffer for zero-copy transmission.
-     * Returns the total message length.
      * Uses UTF-8 encoding for consistent character handling.
+     * 
+     * @param event the event to serialize
+     * @param buffer the buffer to write the serialized event into
+     * @return the total message length in bytes
+     * @throws IllegalArgumentException if the payload is too large
      */
     private int serializeEvent(Event event, UnsafeBuffer buffer) {
         int offset = 0;
@@ -224,6 +241,11 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     /**
      * Deserializes an event from the buffer.
      * Uses UTF-8 encoding for consistent character handling.
+     * 
+     * @param buffer the buffer containing the serialized event
+     * @param offset the starting offset in the buffer
+     * @return the deserialized Event object
+     * @throws IllegalArgumentException if the payload length is invalid
      */
     private Event deserializeEvent(DirectBuffer buffer, int offset) {
         int pos = offset;
@@ -260,6 +282,15 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         return Event.create(timestamp, sequence, sourceId, eventType, header, payload);
     }
 
+    /**
+     * Subscribes a handler to receive events of a specific type.
+     * This method is thread-safe.
+     * 
+     * @param eventType the type of events to subscribe to
+     * @param handler the handler to receive events (must not be null)
+     * @return a Subscription object that can be used to unsubscribe
+     * @throws IllegalArgumentException if eventType is out of bounds or handler is null
+     */
     @Override
     public Subscription subscribe(int eventType, EventHandler<?> handler) {
         if (eventType < 0 || eventType >= handlers.length) {
@@ -285,11 +316,22 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         };
     }
 
+    /**
+     * Returns the total number of events published since the event bus was started.
+     * 
+     * @return the count of published events
+     */
     @Override
     public long getPublishedEventCount() {
         return publishedCount.get();
     }
 
+    /**
+     * Returns the number of subscribers for a specific event type.
+     * 
+     * @param eventType the event type to query
+     * @return the count of subscribers, or 0 if eventType is invalid
+     */
     @Override
     public int getSubscriberCount(int eventType) {
         if (eventType < 0 || eventType >= handlers.length) {
@@ -298,12 +340,32 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         return handlers[eventType].size();
     }
 
+    /**
+     * Starts the event bus and begins polling for incoming events.
+     * This method blocks briefly while waiting for the publication to connect.
+     * 
+     * @throws IllegalStateException if the publication fails to connect or if interrupted
+     */
     @Override
     public void start() {
         if (running.compareAndSet(false, true)) {
-            // Wait for publication to be connected
-            while (!publication.isConnected()) {
-                Thread.yield();
+            // Wait for publication to be connected with timeout to prevent infinite loop
+            int attempts = 0;
+            final int maxAttempts = 100; // Max ~1 second with sleep
+            while (!publication.isConnected() && attempts < maxAttempts) {
+                try {
+                    Thread.sleep(10); // Sleep 10ms between checks
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    running.set(false);
+                    throw new IllegalStateException("Interrupted while waiting for publication connection", e);
+                }
+                attempts++;
+            }
+            
+            if (!publication.isConnected()) {
+                running.set(false);
+                throw new IllegalStateException("Publication failed to connect after " + maxAttempts + " attempts");
             }
 
             // Start polling thread
@@ -314,8 +376,8 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     }
 
     /**
-     * Main polling loop that receives messages from Aeron and dispatches to
-     * handlers.
+     * Main polling loop that receives messages from Aeron and dispatches to handlers.
+     * This method runs in a dedicated thread until stop() is called.
      */
     private void pollLoop() {
         final FragmentHandler fragmentHandler = new FragmentAssembler(this::onFragment);
@@ -328,6 +390,11 @@ public class AeronEventBus implements EventBus, AutoCloseable {
 
     /**
      * Handles incoming fragments from Aeron subscription.
+     * 
+     * @param buffer the buffer containing the message data
+     * @param offset the offset within the buffer where the message starts
+     * @param length the length of the message (currently unused but part of FragmentHandler signature)
+     * @param header the Aeron message header (currently unused but part of FragmentHandler signature)
      */
     private void onFragment(DirectBuffer buffer, int offset, int length, Header header) {
         try {
@@ -365,11 +432,20 @@ public class AeronEventBus implements EventBus, AutoCloseable {
         }
     }
 
+    /**
+     * Stops the event bus and releases all resources.
+     * This method delegates to close() for proper resource cleanup.
+     */
     @Override
     public void stop() {
         close();
     }
 
+    /**
+     * Closes the event bus and releases all Aeron resources.
+     * This method is idempotent and can be called multiple times safely.
+     * Implements AutoCloseable for use in try-with-resources statements.
+     */
     @Override
     public void close() {
         if (running.compareAndSet(true, false)) {
@@ -379,47 +455,43 @@ public class AeronEventBus implements EventBus, AutoCloseable {
                     pollingThread.join(THREAD_JOIN_TIMEOUT_MS);
                     if (pollingThread.isAlive()) {
                         pollingThread.interrupt();
+                        // Give it one more chance to exit gracefully
+                        pollingThread.join(1000);
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    LOGGER.log(Level.WARNING, "Interrupted while stopping polling thread", e);
                 }
             }
 
             // Close Aeron resources in reverse order of creation
-            try {
-                if (publication != null) {
-                    publication.close();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Failed to close Aeron publication", e);
-            }
-
-            try {
-                if (aeronSubscription != null) {
-                    aeronSubscription.close();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Failed to close Aeron subscription", e);
-            }
-
-            try {
-                if (aeron != null) {
-                    aeron.close();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Failed to close Aeron client", e);
-            }
-
-            try {
-                if (mediaDriver != null) {
-                    mediaDriver.close();
-                }
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Failed to close MediaDriver", e);
-            }
+            closeResource(publication, "Aeron publication");
+            closeResource(aeronSubscription, "Aeron subscription");
+            closeResource(aeron, "Aeron client");
+            closeResource(mediaDriver, "MediaDriver");
 
             // Clean up thread-local buffers
-            offerBuffer.remove();
+            try {
+                offerBuffer.remove();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Failed to clean up thread-local buffer", e);
+            }
+        }
+    }
+    
+    /**
+     * Helper method to safely close a resource with logging.
+     * 
+     * @param resource the AutoCloseable resource to close
+     * @param resourceName the name of the resource for logging purposes
+     */
+    private void closeResource(AutoCloseable resource, String resourceName) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                LOGGER.log(Level.WARNING, "Failed to close " + resourceName, e);
+            }
         }
     }
 
