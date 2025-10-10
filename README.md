@@ -197,6 +197,7 @@ Performance regression comparison.
 ## Documentation
 
 - [Event Bus README](docs/EVENT_BUS_README.md)
+- [Metrics & Backpressure Guide](docs/METRICS_BACKPRESSURE_GUIDE.md)
 - [Architecture Decision Records](docs/adr/)
 - [UML Diagrams](docs/uml/)
 
