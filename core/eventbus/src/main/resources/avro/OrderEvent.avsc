@@ -1,0 +1,58 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "com.thelastwar.eventbus.model",
+  "doc": "Immutable Order Event record for representing order lifecycle events.",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": "long",
+      "doc": "Unique order identifier"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol/instrument"
+    },
+    {
+      "name": "side",
+      "type": "int",
+      "doc": "Order side: 1=Buy, 2=Sell"
+    },
+    {
+      "name": "orderType",
+      "type": "int",
+      "doc": "Order type: 1=Market, 2=Limit, 3=Stop, 4=StopLimit"
+    },
+    {
+      "name": "quantity",
+      "type": "long",
+      "doc": "Order quantity (in lots or shares)"
+    },
+    {
+      "name": "price",
+      "type": "long",
+      "doc": "Order price (in minimum price increments, e.g., cents or ticks)"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Event timestamp in nanoseconds"
+    },
+    {
+      "name": "status",
+      "type": "int",
+      "doc": "Order status: 0=New, 1=PartiallyFilled, 2=Filled, 3=Cancelled, 4=Rejected"
+    },
+    {
+      "name": "account",
+      "type": "long",
+      "doc": "Trading account identifier"
+    },
+    {
+      "name": "exchange",
+      "type": "int",
+      "doc": "Exchange identifier"
+    }
+  ]
+}

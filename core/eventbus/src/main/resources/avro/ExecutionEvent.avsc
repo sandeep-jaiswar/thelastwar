@@ -1,0 +1,78 @@
+{
+  "type": "record",
+  "name": "ExecutionEvent",
+  "namespace": "com.thelastwar.eventbus.model",
+  "doc": "Immutable Execution Event record representing an execution report from the matching engine.",
+  "fields": [
+    {
+      "name": "executionId",
+      "type": "long",
+      "doc": "Unique execution identifier"
+    },
+    {
+      "name": "orderId",
+      "type": "long",
+      "doc": "Associated order identifier"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol/instrument"
+    },
+    {
+      "name": "side",
+      "type": "int",
+      "doc": "Execution side: 1=Buy, 2=Sell"
+    },
+    {
+      "name": "executionType",
+      "type": "int",
+      "doc": "Type: 0=New, 1=PartialFill, 2=Fill, 3=Cancelled, 4=Rejected, 5=Replaced"
+    },
+    {
+      "name": "orderStatus",
+      "type": "int",
+      "doc": "Current order status after this execution"
+    },
+    {
+      "name": "lastQuantity",
+      "type": "long",
+      "doc": "Quantity executed in this event (0 for non-fill events)"
+    },
+    {
+      "name": "lastPrice",
+      "type": "long",
+      "doc": "Price of this execution (0 for non-fill events)"
+    },
+    {
+      "name": "cumulativeQty",
+      "type": "long",
+      "doc": "Total quantity filled so far"
+    },
+    {
+      "name": "leavesQuantity",
+      "type": "long",
+      "doc": "Remaining unfilled quantity"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Execution timestamp in nanoseconds"
+    },
+    {
+      "name": "account",
+      "type": "long",
+      "doc": "Trading account identifier"
+    },
+    {
+      "name": "exchange",
+      "type": "int",
+      "doc": "Exchange identifier"
+    },
+    {
+      "name": "rejectReason",
+      "type": "int",
+      "doc": "Rejection reason code (0 if not rejected)"
+    }
+  ]
+}
