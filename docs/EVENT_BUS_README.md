@@ -287,6 +287,15 @@ thelastwar/
 - **Safe Subscribe/Unsubscribe**: Can modify subscriptions while publishing
 - **Memory Visibility**: Volatile fields and atomic counters ensure visibility
 
+## Performance and Tuning
+
+For comprehensive information on performance optimization and benchmarking:
+
+- **[Performance Tuning Guide](PERFORMANCE_TUNING.md)**: System-level and JVM tuning for ultra-low latency
+- **[Benchmark Guide](BENCHMARK_GUIDE.md)**: Running and interpreting performance benchmarks
+- **[Aeron README](../core/eventbus/AERON_README.md)**: Aeron-specific implementation details
+- **[Aeron Configuration](../core/eventbus/AERON_CONFIG.md)**: Advanced Aeron configuration
+
 ## Future Enhancements
 
 1. **Priority Queues**: Support event prioritization

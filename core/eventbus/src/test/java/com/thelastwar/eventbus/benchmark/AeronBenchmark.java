@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
         "-Xms2G",
         "-Xmx2G",
         "-XX:+UseG1GC",
+        "-XX:MaxGCPauseMillis=1",
+        "-Xlog:gc*:file=/tmp/aeron_gc.log",
         "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
         "--add-opens", "java.base/java.util.zip=ALL-UNNAMED"
 })
@@ -206,6 +208,22 @@ public class AeronBenchmark {
             Thread.onSpinWait();
         }
         return true;
+    }
+
+    /**
+     * Sustained throughput test: 60-second measurement.
+     * Validates acceptance criteria: > 2M msgs/s for 60 seconds.
+     */
+    @Benchmark
+    @BenchmarkMode(Mode.Throughput)
+    @OutputTimeUnit(TimeUnit.SECONDS)
+    @Warmup(iterations = 3, time = 5, timeUnit = TimeUnit.SECONDS)
+    @Measurement(iterations = 1, time = 60, timeUnit = TimeUnit.SECONDS)
+    public void benchmarkSustained60Seconds(BenchmarkState state) {
+        // Retry until publish succeeds to ensure accurate throughput measurement
+        while (!state.eventBus.publish(state.smallEvent128B)) {
+            Thread.onSpinWait();
+        }
     }
 
     /**
