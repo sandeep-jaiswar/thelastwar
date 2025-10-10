@@ -307,7 +307,7 @@ class AeronEventBusTest {
         CountDownLatch successLatch = new CountDownLatch(1);
 
         // Subscribe with a handler that throws
-        eventBus.subscribe(EventType.MARKET_DATA_UPDATE, new EventHandler<String>() {
+        eventBus.subscribe(EventType.MARKET_DATA_UPDATE, new EventHandler() {
             @Override
             public void onEvent(Event event) {
                 throw new RuntimeException("Test exception");

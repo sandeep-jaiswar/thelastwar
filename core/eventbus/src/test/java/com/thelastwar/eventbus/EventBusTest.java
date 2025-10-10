@@ -28,11 +28,12 @@ class EventBusTest {
     @Test
     void testPublishAndSubscribe() {
         AtomicInteger eventCount = new AtomicInteger(0);
-        EventHandler<String> handler = event -> eventCount.incrementAndGet();
+        EventHandler handler = event -> eventCount.incrementAndGet();
 
         eventBus.subscribe(EventType.MARKET_DATA_UPDATE, handler);
 
-        Event event = Event.create(System.nanoTime(), 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_UPDATE, 0L, "data");
+        Event event = Event.create(System.nanoTime(), 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_UPDATE, 0L,
+                "data");
         assertTrue(eventBus.publish(event));
 
         assertEquals(1, eventCount.get());
@@ -49,7 +50,8 @@ class EventBusTest {
 
         assertEquals(2, eventBus.getSubscriberCount(EventType.ORDER_FILLED));
 
-        Event event = Event.create(System.nanoTime(), 1L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L, "order");
+        Event event = Event.create(System.nanoTime(), 1L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L,
+                "order");
         eventBus.publish(event);
 
         assertEquals(1, count1.get());
@@ -59,19 +61,21 @@ class EventBusTest {
     @Test
     void testUnsubscribe() {
         AtomicInteger eventCount = new AtomicInteger(0);
-        EventHandler<String> handler = event -> eventCount.incrementAndGet();
+        EventHandler handler = event -> eventCount.incrementAndGet();
 
         EventBus.Subscription subscription = eventBus.subscribe(EventType.RISK_CHECK_PASSED, handler);
         assertTrue(subscription.isActive());
 
-        Event event1 = Event.create(System.nanoTime(), 1L, SourceId.RISK_MANAGER, EventType.RISK_CHECK_PASSED, 0L, "check1");
+        Event event1 = Event.create(System.nanoTime(), 1L, SourceId.RISK_MANAGER, EventType.RISK_CHECK_PASSED, 0L,
+                "check1");
         eventBus.publish(event1);
         assertEquals(1, eventCount.get());
 
         subscription.unsubscribe();
         assertFalse(subscription.isActive());
 
-        Event event2 = Event.create(System.nanoTime(), 2L, SourceId.RISK_MANAGER, EventType.RISK_CHECK_PASSED, 0L, "check2");
+        Event event2 = Event.create(System.nanoTime(), 2L, SourceId.RISK_MANAGER, EventType.RISK_CHECK_PASSED, 0L,
+                "check2");
         eventBus.publish(event2);
         assertEquals(1, eventCount.get()); // Should still be 1
     }
@@ -84,8 +88,10 @@ class EventBusTest {
         eventBus.subscribe(EventType.MARKET_DATA_UPDATE, event -> marketDataCount.incrementAndGet());
         eventBus.subscribe(EventType.ORDER_FILLED, event -> orderCount.incrementAndGet());
 
-        Event marketDataEvent = Event.create(System.nanoTime(), 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_UPDATE, 0L, "data");
-        Event orderEvent = Event.create(System.nanoTime(), 2L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L, "order");
+        Event marketDataEvent = Event.create(System.nanoTime(), 1L, SourceId.FEED_HANDLER, EventType.MARKET_DATA_UPDATE,
+                0L, "data");
+        Event orderEvent = Event.create(System.nanoTime(), 2L, SourceId.MATCHING_ENGINE, EventType.ORDER_FILLED, 0L,
+                "order");
 
         eventBus.publish(marketDataEvent);
         eventBus.publish(orderEvent);
@@ -97,8 +103,8 @@ class EventBusTest {
     @Test
     void testHandlerException() {
         AtomicInteger errorCount = new AtomicInteger(0);
-        
-        EventHandler<String> faultyHandler = new EventHandler<String>() {
+
+        EventHandler faultyHandler = new EventHandler() {
             @Override
             public void onEvent(Event event) {
                 throw new RuntimeException("Handler error");
@@ -134,7 +140,8 @@ class EventBusTest {
 
     @Test
     void testSubscribeWithInvalidEventType() {
-        EventHandler<String> handler = event -> {};
+        EventHandler handler = event -> {
+        };
         assertThrows(IllegalArgumentException.class, () -> eventBus.subscribe(-1, handler));
         assertThrows(IllegalArgumentException.class, () -> eventBus.subscribe(10000, handler));
     }
@@ -148,12 +155,13 @@ class EventBusTest {
     void testHighThroughput() throws InterruptedException {
         int eventCount = 1000;
         CountDownLatch latch = new CountDownLatch(eventCount);
-        
-        EventHandler<String> handler = event -> latch.countDown();
+
+        EventHandler handler = event -> latch.countDown();
         eventBus.subscribe(EventType.LATENCY_SAMPLE, handler);
 
         for (int i = 0; i < eventCount; i++) {
-            Event event = Event.create(System.nanoTime(), i, SourceId.ANALYTICS, EventType.LATENCY_SAMPLE, 0L, "sample" + i);
+            Event event = Event.create(System.nanoTime(), i, SourceId.ANALYTICS, EventType.LATENCY_SAMPLE, 0L,
+                    "sample" + i);
             eventBus.publish(event);
         }
 
@@ -165,10 +173,12 @@ class EventBusTest {
     void testGetSubscriberCount() {
         assertEquals(0, eventBus.getSubscriberCount(EventType.ORDER_ACCEPTED));
 
-        EventBus.Subscription sub1 = eventBus.subscribe(EventType.ORDER_ACCEPTED, event -> {});
+        EventBus.Subscription sub1 = eventBus.subscribe(EventType.ORDER_ACCEPTED, event -> {
+        });
         assertEquals(1, eventBus.getSubscriberCount(EventType.ORDER_ACCEPTED));
 
-        EventBus.Subscription sub2 = eventBus.subscribe(EventType.ORDER_ACCEPTED, event -> {});
+        EventBus.Subscription sub2 = eventBus.subscribe(EventType.ORDER_ACCEPTED, event -> {
+        });
         assertEquals(2, eventBus.getSubscriberCount(EventType.ORDER_ACCEPTED));
 
         sub1.unsubscribe();

@@ -24,9 +24,9 @@ public class InMemoryEventBus implements EventBus {
     public InMemoryEventBus() {
         // Pre-allocate handler arrays for all possible event types
         // Using arrays indexed by event type for O(1) lookup
-        this.handlers = new List[10000];
+        this.handlers = new CopyOnWriteArrayList[10000];
         for (int i = 0; i < handlers.length; i++) {
-            handlers[i] = new CopyOnWriteArrayList<>();
+            handlers[i] = new CopyOnWriteArrayList<HandlerRegistration>();
         }
     }
 
@@ -65,7 +65,7 @@ public class InMemoryEventBus implements EventBus {
     }
 
     @Override
-    public Subscription subscribe(int eventType, EventHandler<?> handler) {
+    public Subscription subscribe(int eventType, EventHandler handler) {
         if (handler == null || eventType < 0 || eventType >= handlers.length) {
             throw new IllegalArgumentException("Invalid event type or null handler");
         }
@@ -113,10 +113,10 @@ public class InMemoryEventBus implements EventBus {
     }
 
     private static class HandlerRegistration {
-        final EventHandler<?> handler;
+        final EventHandler handler;
         volatile boolean active = true;
 
-        HandlerRegistration(EventHandler<?> handler) {
+        HandlerRegistration(EventHandler handler) {
             this.handler = handler;
         }
 

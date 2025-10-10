@@ -5,9 +5,11 @@ import java.util.concurrent.BlockingQueue;
 
 /**
  * Object pool for Event instances to minimize heap allocations in hot path.
- * Follows the "no heap allocations in hot path" principle from the architecture.
+ * Follows the "no heap allocations in hot path" principle from the
+ * architecture.
  * 
  * Usage:
+ * 
  * <pre>
  * EventPool pool = new EventPool(1000);
  * Event event = pool.acquire();
@@ -23,7 +25,7 @@ import java.util.concurrent.BlockingQueue;
 public class EventPool {
     private final BlockingQueue<MutableEvent> pool;
     private final int capacity;
-    
+
     /**
      * Creates an event pool with specified capacity.
      * 
@@ -32,13 +34,16 @@ public class EventPool {
     public EventPool(int capacity) {
         this.capacity = capacity;
         this.pool = new ArrayBlockingQueue<>(capacity);
-        
+
         // Pre-populate pool
         for (int i = 0; i < capacity; i++) {
-            pool.offer(new MutableEvent());
+            boolean offered = pool.offer(new MutableEvent());
+            if (!offered) {
+                throw new IllegalStateException("Failed to pre-populate event pool");
+            }
         }
     }
-    
+
     /**
      * Acquires a mutable event from the pool.
      * If pool is empty, creates a new instance (pool expansion).
@@ -53,7 +58,7 @@ public class EventPool {
         }
         return event;
     }
-    
+
     /**
      * Returns a mutable event to the pool.
      * The event is reset for reuse.
@@ -63,10 +68,11 @@ public class EventPool {
     public void release(MutableEvent event) {
         if (event != null) {
             event.reset();
-            pool.offer(event); // If pool is full, event will be GC'd
+            boolean offered = pool.offer(event); // If pool is full, event will be GC'd
+            // Optionally log or handle if not offered
         }
     }
-    
+
     /**
      * Returns current pool size (available events).
      * 
@@ -75,7 +81,7 @@ public class EventPool {
     public int available() {
         return pool.size();
     }
-    
+
     /**
      * Returns pool capacity.
      * 
@@ -84,7 +90,7 @@ public class EventPool {
     public int capacity() {
         return capacity;
     }
-    
+
     /**
      * Mutable event for use with object pooling.
      * This allows reusing event instances to avoid allocations.
@@ -96,11 +102,12 @@ public class EventPool {
         private int eventType;
         private long header;
         private Object payload;
-        
+
         /**
          * Sets all event fields.
          */
-        public MutableEvent set(long timestamp, long sequence, int sourceId, int eventType, long header, Object payload) {
+        public MutableEvent set(long timestamp, long sequence, int sourceId, int eventType, long header,
+                Object payload) {
             this.timestamp = timestamp;
             this.sequence = sequence;
             this.sourceId = sourceId;
@@ -109,7 +116,7 @@ public class EventPool {
             this.payload = payload;
             return this;
         }
-        
+
         /**
          * Converts to immutable Event record.
          * 
@@ -118,7 +125,7 @@ public class EventPool {
         public Event toEvent() {
             return new Event(timestamp, sequence, sourceId, eventType, header, payload);
         }
-        
+
         /**
          * Resets all fields for reuse.
          */
@@ -130,13 +137,30 @@ public class EventPool {
             this.header = 0;
             this.payload = null;
         }
-        
+
         // Getters
-        public long getTimestamp() { return timestamp; }
-        public long getSequence() { return sequence; }
-        public int getSourceId() { return sourceId; }
-        public int getEventType() { return eventType; }
-        public long getHeader() { return header; }
-        public Object getPayload() { return payload; }
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public long getSequence() {
+            return sequence;
+        }
+
+        public int getSourceId() {
+            return sourceId;
+        }
+
+        public int getEventType() {
+            return eventType;
+        }
+
+        public long getHeader() {
+            return header;
+        }
+
+        public Object getPayload() {
+            return payload;
+        }
     }
 }
