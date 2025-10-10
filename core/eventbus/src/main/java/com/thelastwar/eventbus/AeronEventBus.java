@@ -7,6 +7,8 @@ import io.aeron.driver.MediaDriver;
 import io.aeron.driver.ThreadingMode;
 import io.aeron.logbuffer.FragmentHandler;
 import io.aeron.logbuffer.Header;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.agrona.DirectBuffer;
 import org.agrona.concurrent.BackoffIdleStrategy;
 import org.agrona.concurrent.IdleStrategy;
@@ -80,6 +82,7 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     // Event handling
     private final List<HandlerRegistration>[] handlers;
     private final AtomicLong publishedCount = new AtomicLong(0);
+    private final AtomicLong consumedCount = new AtomicLong(0);
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     // Polling thread for subscribers
@@ -90,13 +93,28 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     // Pre-allocated buffer for zero-allocation publishing (thread-local for safety)
     private final ThreadLocal<UnsafeBuffer> offerBuffer = ThreadLocal.withInitial(
             () -> new UnsafeBuffer(ByteBuffer.allocateDirect(MAX_MESSAGE_SIZE)));
+    
+    // Metrics and backpressure
+    private final EventBusMetrics metrics;
+    private final BackpressureMonitor backpressureMonitor;
+    private final boolean metricsEnabled;
 
     /**
      * Creates a new AeronEventBus with optimized configuration.
      * This constructor uses an embedded MediaDriver with default optimized settings.
      */
     public AeronEventBus() {
-        this(createOptimizedMediaDriver());
+        this(createOptimizedMediaDriver(), new SimpleMeterRegistry(), "default");
+    }
+    
+    /**
+     * Creates a new AeronEventBus with custom MeterRegistry for metrics.
+     * 
+     * @param registry the Micrometer registry for metrics
+     * @param busName unique name for this event bus instance
+     */
+    public AeronEventBus(MeterRegistry registry, String busName) {
+        this(createOptimizedMediaDriver(), registry, busName);
     }
 
     /**
@@ -107,7 +125,25 @@ public class AeronEventBus implements EventBus, AutoCloseable {
      */
     @SuppressWarnings({"unchecked", "rawtypes"}) // Generic array creation is required here
     public AeronEventBus(MediaDriver mediaDriver) {
+        this(mediaDriver, new SimpleMeterRegistry(), "default");
+    }
+    
+    /**
+     * Creates a new AeronEventBus with custom MediaDriver and metrics.
+     * 
+     * @param mediaDriver the custom MediaDriver to use
+     * @param registry the Micrometer registry for metrics
+     * @param busName unique name for this event bus instance
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"}) // Generic array creation is required here
+    public AeronEventBus(MediaDriver mediaDriver, MeterRegistry registry, String busName) {
         this.mediaDriver = mediaDriver;
+        this.metricsEnabled = registry != null;
+        this.metrics = metricsEnabled ? new EventBusMetrics(registry, busName) : null;
+        
+        // Initialize backpressure monitor with term buffer size
+        // Using 80% high watermark and 50% low watermark
+        this.backpressureMonitor = new BackpressureMonitor(TERM_BUFFER_LENGTH);
 
         // Create Aeron instance
         final Aeron.Context ctx = new Aeron.Context()
@@ -158,12 +194,18 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     @Override
     public boolean publish(Event event) {
         if (!running.get()) {
+            if (metricsEnabled) {
+                metrics.recordFailedPublish();
+            }
             return false;
         }
 
         if (event == null) {
             throw new IllegalArgumentException("Event cannot be null");
         }
+        
+        // Track start time for latency measurement
+        final long startNanos = metricsEnabled ? System.nanoTime() : 0;
 
         // Serialize event into buffer (zero-allocation after buffer is allocated)
         final UnsafeBuffer buffer = offerBuffer.get();
@@ -175,19 +217,41 @@ public class AeronEventBus implements EventBus, AutoCloseable {
                     "Event too large: " + messageLength + " bytes (max: " + MAX_MESSAGE_SIZE + ")");
         }
 
+        // Check backpressure before attempting to publish
+        if (backpressureMonitor.isBackpressureActive()) {
+            if (metricsEnabled) {
+                metrics.recordBackpressureEvent();
+                metrics.recordDroppedMessage();
+            }
+            return false;
+        }
+
         // Offer to Aeron publication
         final long result = publication.offer(buffer, 0, messageLength);
 
         if (result > 0) {
-            publishedCount.incrementAndGet();
+            final long position = publishedCount.incrementAndGet();
+            backpressureMonitor.updateProducerPosition(position);
+            
+            if (metricsEnabled) {
+                final long latencyNanos = System.nanoTime() - startNanos;
+                metrics.recordPublish(latencyNanos);
+                metrics.setQueueDepth(backpressureMonitor.getUtilizationPercent());
+            }
             return true;
         }
 
         if (result == Publication.NOT_CONNECTED || result == Publication.CLOSED) {
+            if (metricsEnabled) {
+                metrics.recordFailedPublish();
+            }
             return false;
         }
 
         // Back pressure (BACK_PRESSURED/ADMIN_ACTION): signal caller to retry
+        if (metricsEnabled) {
+            metrics.recordBackpressureEvent();
+        }
         return false;
     }
 
@@ -302,11 +366,29 @@ public class AeronEventBus implements EventBus, AutoCloseable {
 
         HandlerRegistration registration = new HandlerRegistration(handler);
         handlers[eventType].add(registration);
+        
+        // Update metrics
+        if (metricsEnabled) {
+            long totalSubscribers = 0;
+            for (List<HandlerRegistration> handlerList : handlers) {
+                totalSubscribers += handlerList.size();
+            }
+            metrics.setActiveSubscribers(totalSubscribers);
+        }
 
         return new Subscription() {
             @Override
             public void unsubscribe() {
                 handlers[eventType].remove(registration);
+                
+                // Update metrics
+                if (metricsEnabled) {
+                    long totalSubscribers = 0;
+                    for (List<HandlerRegistration> handlerList : handlers) {
+                        totalSubscribers += handlerList.size();
+                    }
+                    metrics.setActiveSubscribers(totalSubscribers);
+                }
             }
 
             @Override
@@ -324,6 +406,24 @@ public class AeronEventBus implements EventBus, AutoCloseable {
     @Override
     public long getPublishedEventCount() {
         return publishedCount.get();
+    }
+    
+    /**
+     * Gets the EventBusMetrics instance for this bus.
+     * 
+     * @return the metrics instance, or null if metrics are disabled
+     */
+    public EventBusMetrics getMetrics() {
+        return metrics;
+    }
+    
+    /**
+     * Gets the BackpressureMonitor instance for this bus.
+     * 
+     * @return the backpressure monitor
+     */
+    public BackpressureMonitor getBackpressureMonitor() {
+        return backpressureMonitor;
     }
 
     /**
@@ -424,6 +524,14 @@ public class AeronEventBus implements EventBus, AutoCloseable {
                                 errorHandlerException);
                     }
                 }
+            }
+            
+            // Update consumer position for backpressure monitoring
+            long position = consumedCount.incrementAndGet();
+            backpressureMonitor.updateConsumerPosition(position);
+            
+            if (metricsEnabled) {
+                metrics.setQueueDepth(backpressureMonitor.getUtilizationPercent());
             }
         } catch (Exception e) {
             // Deserialization or other unexpected error - log and continue processing to

@@ -20,7 +20,9 @@ dependencies {
     // Aeron for ultra-low latency messaging
     implementation("io.aeron:aeron-all:1.44.1")
     
-    // JUnit 5 for unit testing
+    // Micrometer for metrics and observability
+    api("io.micrometer:micrometer-core:1.12.13")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus:1.12.13")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")

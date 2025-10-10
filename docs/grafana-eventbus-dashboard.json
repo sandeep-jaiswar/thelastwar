@@ -1,0 +1,573 @@
+{
+  "dashboard": {
+    "title": "EventBus Metrics Dashboard",
+    "tags": ["eventbus", "performance", "backpressure"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Event Throughput",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(eventbus_events_published_total[1m])",
+            "legendFormat": "{{bus}} - Published/sec",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Events per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "pointradius": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 2,
+        "title": "Publish Latency Distribution",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(eventbus_publish_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{bus}} - p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(eventbus_publish_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{bus}} - p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(eventbus_publish_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{bus}} - p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        },
+        "thresholds": [
+          {
+            "value": 0.00001,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Backpressure Events",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(eventbus_backpressure_events_total[1m])",
+            "legendFormat": "{{bus}} - Backpressure/sec",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Events per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "bars": false,
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "1m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "60s",
+          "handler": 1,
+          "name": "High Backpressure Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "total": true
+        }
+      },
+      {
+        "id": 4,
+        "title": "Dropped Messages",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(eventbus_messages_dropped_total[1m])",
+            "legendFormat": "{{bus}} - Dropped/sec",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Messages per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "bars": true,
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "60s",
+          "handler": 1,
+          "name": "Message Loss Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "total": true
+        }
+      },
+      {
+        "id": 5,
+        "title": "Queue Depth",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "eventbus_queue_depth",
+            "legendFormat": "{{bus}} - Utilization %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "label": "Utilization",
+            "max": 100,
+            "min": 0
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 2,
+        "linewidth": 2,
+        "thresholds": [
+          {
+            "value": 50,
+            "colorMode": "custom",
+            "op": "gt",
+            "fill": true,
+            "line": false,
+            "yaxis": "left"
+          },
+          {
+            "value": 80,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true,
+            "yaxis": "left"
+          }
+        ],
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 6,
+        "title": "Active Subscribers",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "eventbus_subscribers_active",
+            "legendFormat": "{{bus}} - Subscribers",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Count"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "steppedLine": true,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true
+        }
+      },
+      {
+        "id": 7,
+        "title": "Failed Publishes",
+        "type": "stat",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(increase(eventbus_publishes_failed_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                },
+                {
+                  "value": 10,
+                  "color": "yellow"
+                },
+                {
+                  "value": 100,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Total Events Published",
+        "type": "stat",
+        "gridPos": {
+          "x": 6,
+          "y": 24,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(eventbus_events_published_total)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "P99 Latency Target",
+        "type": "stat",
+        "gridPos": {
+          "x": 12,
+          "y": 24,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(eventbus_publish_latency_seconds_bucket[1m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                },
+                {
+                  "value": 0.00001,
+                  "color": "yellow"
+                },
+                {
+                  "value": 0.00005,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Message Loss Rate",
+        "type": "stat",
+        "gridPos": {
+          "x": 18,
+          "y": 24,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(eventbus_messages_dropped_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": null,
+                  "color": "green"
+                },
+                {
+                  "value": 0.01,
+                  "color": "yellow"
+                },
+                {
+                  "value": 1,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    }
+  }
+}
