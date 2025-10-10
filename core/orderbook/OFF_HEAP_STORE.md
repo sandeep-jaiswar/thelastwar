@@ -69,13 +69,27 @@ long count = store.size();
 ### Persistence and Recovery
 
 ```java
-// Ensure all writes are persisted to disk
+// Store orders (in-memory, not yet persisted)
+for (Order order : orders) {
+    store.put(order);
+}
+
+// Ensure all writes are persisted to disk (explicit flush)
 store.flush();
+
+// Or persistence happens automatically on close
+store.close();
 
 // After system crash, reopen the store
 OrderStateStore recoveredStore = MappedOrderStateStore.createPersisted(file, 10000);
-// All orders from before the crash are restored
+// All orders from last flush()/close() are restored
 ```
+
+**Persistence Model:**
+- Write operations (put/remove) are **not** immediately persisted for optimal performance (O(1))
+- Call `flush()` explicitly to persist current state to disk
+- Persistence happens automatically on `close()`
+- This ensures < 2 µs latency for all operations
 
 ### Cleanup
 
@@ -155,10 +169,10 @@ OrderStateStore recovered = MappedOrderStateStore.createPersisted(
 
 ### Persistence Guarantees
 
-- **Automatic persistence** on write operations (when using persisted store)
+- **Deferred persistence** for optimal performance (call `flush()` to persist)
 - **Manual flush** via `flush()` method
 - **Automatic flush** on `close()`
-- **Recovery** on store reopening
+- **Recovery** on store reopening loads all orders from last flush/close
 
 ## Testing
 

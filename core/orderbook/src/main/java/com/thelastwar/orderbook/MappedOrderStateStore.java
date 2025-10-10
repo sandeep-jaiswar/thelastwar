@@ -38,7 +38,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class MappedOrderStateStore implements OrderStateStore {
     
-    private static final int ORDER_SIZE = 128; // bytes per order (generous for symbol)
+    private static final int MAX_SYMBOL_LENGTH = 32; // Max symbol length
+    private static final int ORDER_SIZE = 8 + 4 + MAX_SYMBOL_LENGTH + 1 + 8 + 8 + 8; // 69 bytes: orderId(8) + symbolLen(4) + symbol(32) + side(1) + price(8) + qty(8) + ts(8)
     private static final int MAX_ORDERS = 100000;
     
     private final Map<Long, Order> orderMap;
@@ -114,7 +115,8 @@ public class MappedOrderStateStore implements OrderStateStore {
                     orderMap.put(order.orderId(), order);
                 }
             } catch (Exception e) {
-                // Skip corrupted entries
+                // Log error and skip corrupted entries
+                System.err.println("Warning: Failed to load order at index " + i + ": " + e.getMessage());
                 break;
             }
         }
@@ -126,9 +128,8 @@ public class MappedOrderStateStore implements OrderStateStore {
         lock.writeLock().lock();
         try {
             orderMap.put(order.orderId(), order);
-            if (mappedBuffer != null) {
-                persistToFile();
-            }
+            // Note: Persistence is deferred to flush() or close() for performance.
+            // This ensures O(1) put operations. Call flush() explicitly for critical points.
         } finally {
             lock.writeLock().unlock();
         }
@@ -151,9 +152,8 @@ public class MappedOrderStateStore implements OrderStateStore {
         lock.writeLock().lock();
         try {
             Order removed = orderMap.remove(orderId);
-            if (removed != null && mappedBuffer != null) {
-                persistToFile();
-            }
+            // Note: Persistence is deferred to flush() or close() for performance.
+            // This ensures O(1) remove operations. Call flush() explicitly for critical points.
             return removed;
         } finally {
             lock.writeLock().unlock();
@@ -189,8 +189,16 @@ public class MappedOrderStateStore implements OrderStateStore {
         try {
             orderMap.clear();
             if (mappedBuffer != null) {
-                mappedBuffer.clear();
+                mappedBuffer.position(0);
                 mappedBuffer.putInt(0); // Write count = 0
+                // Zero out the data area to prevent stale data
+                byte[] zeros = new byte[1024];
+                int remaining = (int) Math.min(mappedBuffer.remaining(), ORDER_SIZE * MAX_ORDERS);
+                while (remaining > 0) {
+                    int toWrite = Math.min(remaining, zeros.length);
+                    mappedBuffer.put(zeros, 0, toWrite);
+                    remaining -= toWrite;
+                }
                 mappedBuffer.force();
             }
         } finally {
@@ -204,7 +212,8 @@ public class MappedOrderStateStore implements OrderStateStore {
         lock.writeLock().lock();
         try {
             if (mappedBuffer != null) {
-                mappedBuffer.force();
+                persistToFile(); // Persist current state to file
+                mappedBuffer.force(); // Force OS to write to disk
             }
         } finally {
             lock.writeLock().unlock();
@@ -226,6 +235,7 @@ public class MappedOrderStateStore implements OrderStateStore {
         try {
             closed = true;
             if (mappedBuffer != null) {
+                persistToFile(); // Persist before closing
                 mappedBuffer.force();
             }
             if (raf != null) {
@@ -271,9 +281,21 @@ public class MappedOrderStateStore implements OrderStateStore {
     private void serializeOrder(ByteBuffer buffer, Order order) {
         buffer.putLong(order.orderId());
         
-        byte[] symbolBytes = order.symbol().getBytes(StandardCharsets.UTF_8);
+        String symbol = order.symbol();
+        // Truncate symbol if it exceeds max length
+        if (symbol.length() > MAX_SYMBOL_LENGTH) {
+            symbol = symbol.substring(0, MAX_SYMBOL_LENGTH);
+        }
+        
+        byte[] symbolBytes = symbol.getBytes(StandardCharsets.UTF_8);
         buffer.putInt(symbolBytes.length);
         buffer.put(symbolBytes);
+        
+        // Pad to fixed size
+        int padding = MAX_SYMBOL_LENGTH - symbolBytes.length;
+        for (int i = 0; i < padding; i++) {
+            buffer.put((byte) 0);
+        }
         
         buffer.put(order.side());
         buffer.putLong(order.price());
@@ -285,9 +307,18 @@ public class MappedOrderStateStore implements OrderStateStore {
         long orderId = buffer.getLong();
         
         int symbolLength = buffer.getInt();
+        // Validate symbol length
+        if (symbolLength < 0 || symbolLength > MAX_SYMBOL_LENGTH) {
+            throw new IllegalStateException("Invalid symbol length: " + symbolLength);
+        }
+        
         byte[] symbolBytes = new byte[symbolLength];
         buffer.get(symbolBytes);
         String symbol = new String(symbolBytes, StandardCharsets.UTF_8);
+        
+        // Skip padding
+        int padding = MAX_SYMBOL_LENGTH - symbolLength;
+        buffer.position(buffer.position() + padding);
         
         byte side = buffer.get();
         long price = buffer.getLong();
