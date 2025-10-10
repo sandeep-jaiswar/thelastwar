@@ -86,6 +86,38 @@ List<PriceLevel> topBids = book.getBidLevels(5);
 List<PriceLevel> topAsks = book.getAskLevels(5);
 ```
 
+### Snapshot and Recovery
+
+Create snapshots for state recovery and disaster recovery:
+
+```java
+// Create snapshot of current order book state
+LimitOrderBook.OrderBookSnapshot snapshot = book.createSnapshot();
+
+// Store snapshot (serialize to disk, database, etc.)
+persistSnapshot(snapshot);
+
+// Later: restore from snapshot
+LimitOrderBook newBook = new LimitOrderBook("AAPL");
+LimitOrderBook.OrderBookSnapshot loadedSnapshot = loadSnapshot();
+newBook.restoreFromSnapshot(loadedSnapshot);
+
+// Order book is now in identical state
+```
+
+Snapshots capture:
+- All orders in the book (both buy and sell sides)
+- Price-time priority ordering
+- Order quantities and prices
+- Complete state for deterministic recovery
+
+Use cases:
+- **Disaster recovery**: Quickly restore state after system failure
+- **Testing**: Capture production state for test scenarios
+- **Audit**: Historical state snapshots for compliance
+- **Load balancing**: Clone order book state to new instances
+```
+
 ### Price-Time Priority Example
 
 ```java
@@ -190,10 +222,11 @@ Available benchmarks:
 - [ ] Off-heap storage using Chronicle Map
 - [ ] Lock-free concurrent version
 - [ ] Market order matching engine
-- [ ] Order book snapshots for replay
-- [ ] Integration with event bus for order updates
+- [x] Order book snapshots for replay (implemented)
+- [x] Integration with event bus for order updates (via MatchingEngine)
 - [ ] NUMA-aware memory layout
 - [ ] SBE encoding for serialization
+- [ ] Snapshot compression for efficient storage
 
 ## Integration with Trading System
 
