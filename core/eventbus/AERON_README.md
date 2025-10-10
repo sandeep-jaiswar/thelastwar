@@ -400,6 +400,14 @@ Run benchmarks and analyze with:
 # Results in build/reports/jmh/
 ```
 
+## Additional Documentation
+
+For comprehensive performance tuning and benchmark information, see:
+
+- **[Performance Tuning Guide](../../docs/PERFORMANCE_TUNING.md)**: System-level and JVM tuning for ultra-low latency
+- **[Benchmark Guide](../../docs/BENCHMARK_GUIDE.md)**: Running and interpreting performance benchmarks
+- **[AERON_CONFIG.md](AERON_CONFIG.md)**: Advanced Aeron configuration options
+
 ## License
 
 See the project LICENSE file for details.

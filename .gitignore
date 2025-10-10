@@ -30,3 +30,14 @@ Thumbs.db
 
 # JMH generated files
 jmh-result.json
+
+# Benchmark results
+benchmark-results/
+
+# GC logs
+gc.log
+gc*.log
+aeron_gc.log
+
+# Flight Recorder files
+*.jfr
