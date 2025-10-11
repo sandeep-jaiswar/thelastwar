@@ -169,6 +169,42 @@ public class FixGateway implements GatewayAdapter, Application {
     }
     
     @Override
+    public boolean send(MessageEnvelope envelope) {
+        if (!isRunning()) {
+            LOGGER.warning("Cannot send message - gateway not running");
+            return false;
+        }
+        
+        // For FIX gateway, we need to convert the envelope to a FIX message
+        // This is a placeholder implementation - full conversion would be protocol-specific
+        LOGGER.fine("Sending MessageEnvelope with protocol: " + envelope.getProtocolType() 
+            + ", correlationId: " + envelope.getCorrelationId());
+        
+        // TODO: Implement proper FIX message conversion from MessageEnvelope
+        metrics.recordOutboundMessage();
+        return true;
+    }
+    
+    @Override
+    public void onMessage(MessageEnvelope envelope) {
+        // Process incoming message envelope
+        // This is called when a message is received via the gateway
+        LOGGER.fine("Received MessageEnvelope with protocol: " + envelope.getProtocolType() 
+            + ", correlationId: " + envelope.getCorrelationId());
+        
+        // Publish to EventBus for downstream processing
+        Event event = Event.create(
+            envelope.getTimestamp(),
+            sequence.incrementAndGet(),
+            SourceId.FEED_HANDLER,
+            EventType.ORDER_FILLED,
+            envelope.getCorrelationId(),
+            "Message received from " + envelope.getClientId()
+        );
+        eventBus.publish(event);
+    }
+    
+    @Override
     public EventBus getEventBus() {
         return eventBus;
     }
