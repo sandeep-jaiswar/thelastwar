@@ -1,0 +1,169 @@
+# Prometheus alerting rules for gateway health and observability
+#
+# These rules define alerts for:
+# - High latency (p99 > SLA threshold)
+# - Low throughput
+# - High error rates
+# - Session/connection issues
+
+groups:
+  - name: gateway_latency_alerts
+    interval: 30s
+    rules:
+      # Alert when p99 latency exceeds 1ms (1000µs) for gateway decode operations
+      - alert: HighGatewayDecodeLatency
+        expr: histogram_quantile(0.99, rate(gateway_decode_latency_seconds_bucket[1m])) > 0.001
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High p99 decode latency on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} p99 decode latency is {{ $value | humanizeDuration }}, exceeding 1ms SLA threshold"
+          
+      # Alert when p99 latency exceeds 1ms for gateway encode operations
+      - alert: HighGatewayEncodeLatency
+        expr: histogram_quantile(0.99, rate(gateway_encode_latency_seconds_bucket[1m])) > 0.001
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High p99 encode latency on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} p99 encode latency is {{ $value | humanizeDuration }}, exceeding 1ms SLA threshold"
+          
+      # Alert when WebSocket broadcast p99 latency exceeds 1ms
+      - alert: HighWebSocketBroadcastLatency
+        expr: histogram_quantile(0.99, rate(wsgateway_broadcast_latency_seconds_bucket[1m])) > 0.001
+        for: 5m
+        labels:
+          severity: warning
+          component: websocket-gateway
+        annotations:
+          summary: "High p99 broadcast latency on WebSocket gateway {{ $labels.gateway }}"
+          description: "WebSocket gateway {{ $labels.gateway }} p99 broadcast latency is {{ $value | humanizeDuration }}, exceeding 1ms SLA threshold"
+
+  - name: gateway_error_alerts
+    interval: 30s
+    rules:
+      # Alert on high decode error rate
+      - alert: HighDecodeErrorRate
+        expr: rate(gateway_errors_decode_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "High decode error rate on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} is experiencing {{ $value | humanize }} decode errors per second"
+          
+      # Alert on high encode error rate
+      - alert: HighEncodeErrorRate
+        expr: rate(gateway_errors_encode_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: gateway
+        annotations:
+          summary: "High encode error rate on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} is experiencing {{ $value | humanize }} encode errors per second"
+          
+      # Alert on WebSocket serialization errors
+      - alert: HighSerializationErrorRate
+        expr: rate(wsgateway_serialization_errors_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          component: websocket-gateway
+        annotations:
+          summary: "High serialization error rate on WebSocket gateway {{ $labels.gateway }}"
+          description: "WebSocket gateway {{ $labels.gateway }} is experiencing {{ $value | humanize }} serialization errors per second"
+
+  - name: gateway_throughput_alerts
+    interval: 30s
+    rules:
+      # Alert when gateway throughput drops significantly
+      - alert: LowGatewayThroughput
+        expr: rate(gateway_messages_inbound_total[5m]) + rate(gateway_messages_outbound_total[5m]) < 10
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "Low message throughput on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} throughput is only {{ $value | humanize }} messages/sec"
+          
+      # Alert when WebSocket gateway has low throughput
+      - alert: LowWebSocketThroughput
+        expr: rate(wsgateway_messages_outbound_total[5m]) < 10
+        for: 5m
+        labels:
+          severity: warning
+          component: websocket-gateway
+        annotations:
+          summary: "Low message throughput on WebSocket gateway {{ $labels.gateway }}"
+          description: "WebSocket gateway {{ $labels.gateway }} throughput is only {{ $value | humanize }} messages/sec"
+
+  - name: gateway_session_alerts
+    interval: 30s
+    rules:
+      # Alert when no active sessions
+      - alert: NoActiveSessions
+        expr: gateway_sessions_active == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "No active sessions on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} has no active sessions for 10 minutes"
+          
+      # Alert on high session churn
+      - alert: HighSessionChurn
+        expr: rate(gateway_sessions_disconnects_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: gateway
+        annotations:
+          summary: "High session disconnect rate on gateway {{ $labels.gateway }}"
+          description: "Gateway {{ $labels.gateway }} is experiencing {{ $value | humanize }} session disconnects per second"
+
+  - name: gateway_backpressure_alerts
+    interval: 30s
+    rules:
+      # Alert on WebSocket backpressure events
+      - alert: HighBackpressureEvents
+        expr: rate(wsgateway_backpressure_events_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: websocket-gateway
+        annotations:
+          summary: "High backpressure event rate on WebSocket gateway {{ $labels.gateway }}"
+          description: "WebSocket gateway {{ $labels.gateway }} is experiencing {{ $value | humanize }} backpressure events per second"
+
+  - name: prometheus_scrape_health
+    interval: 30s
+    rules:
+      # Alert when Prometheus fails to scrape gateway metrics
+      - alert: PrometheusScrapeFailed
+        expr: up{job=~".*gateway"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: prometheus
+        annotations:
+          summary: "Prometheus unable to scrape {{ $labels.job }}"
+          description: "Prometheus has failed to scrape metrics from {{ $labels.job }} ({{ $labels.instance }}) for 2 minutes"
+          
+      # Alert when scrape success rate drops below 100%
+      - alert: LowScrapeSucessRate
+        expr: rate(up{job=~".*gateway"}[5m]) < 0.99
+        for: 5m
+        labels:
+          severity: warning
+          component: prometheus
+        annotations:
+          summary: "Low scrape success rate for {{ $labels.job }}"
+          description: "Prometheus scrape success rate for {{ $labels.job }} is {{ $value | humanizePercentage }}"

@@ -23,6 +23,7 @@ dependencies {
     
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-core:1.11.0")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.12.0")
     
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
