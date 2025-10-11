@@ -531,7 +531,10 @@ public class AeronEventBus implements EventBus, AutoCloseable {
             backpressureMonitor.updateConsumerPosition(position);
             
             if (metricsEnabled) {
+                // Update queue depth and consumer lag
                 metrics.setQueueDepth(backpressureMonitor.getUtilizationPercent());
+                long lag = publishedCount.get() - position;
+                metrics.setConsumerLag(Math.max(0, lag));
             }
         } catch (Exception e) {
             // Deserialization or other unexpected error - log and continue processing to
