@@ -1,5 +1,6 @@
 plugins {
     id("java-library")
+    id("jacoco")
 }
 
 dependencies {
@@ -40,6 +41,26 @@ tasks.test {
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = false
+    }
+    
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.80".toBigDecimal()
+            }
+        }
     }
 }
 
