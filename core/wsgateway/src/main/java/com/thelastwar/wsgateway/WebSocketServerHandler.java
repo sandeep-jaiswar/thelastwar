@@ -120,8 +120,9 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<WebSocke
     private void sendError(WebSocketSession session, String errorMessage) {
         try {
             WebSocketMessage error = WebSocketMessage.error(errorMessage);
-            byte[] data = serializer.serialize(null); // Simplified
-            TextWebSocketFrame frame = new TextWebSocketFrame(new String(data));
+            // Create a simple error response
+            String errorJson = "{\"type\":\"ERROR\",\"payload\":\"" + errorMessage + "\"}";
+            TextWebSocketFrame frame = new TextWebSocketFrame(errorJson);
             session.sendMessage(frame);
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Failed to send error message", e);

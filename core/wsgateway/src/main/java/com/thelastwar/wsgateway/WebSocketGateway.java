@@ -105,7 +105,7 @@ public class WebSocketGateway implements GatewayAdapter {
     }
     
     /**
-     * Creates a WebSocketGateway with default wsMetrics.
+     * Creates a WebSocketGateway with default metrics.
      */
     public WebSocketGateway(EventBus eventBus, int port, TransportFormat defaultFormat) {
         this(eventBus, port, defaultFormat, new GatewayMetrics("websocket-gateway"));
