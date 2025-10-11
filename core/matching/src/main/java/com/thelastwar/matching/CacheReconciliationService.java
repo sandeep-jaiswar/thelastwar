@@ -194,7 +194,7 @@ public class CacheReconciliationService {
             
         } catch (Exception e) {
             LOGGER.severe("Cache reconciliation failed: " + e.getMessage());
-            e.printStackTrace();
+            e.getMessage();
         }
     }
     
