@@ -55,6 +55,23 @@ public interface GatewayAdapter extends AutoCloseable {
     boolean sendMessage(Object message);
     
     /**
+     * Sends an outbound message using MessageEnvelope.
+     * This is the preferred method for zero-copy message passing.
+     * 
+     * @param envelope MessageEnvelope containing the message
+     * @return true if successfully sent, false otherwise
+     */
+    boolean send(MessageEnvelope envelope);
+    
+    /**
+     * Callback invoked when a message is received.
+     * Implementations should process the message and return quickly to avoid blocking.
+     * 
+     * @param envelope MessageEnvelope containing the received message
+     */
+    void onMessage(MessageEnvelope envelope);
+    
+    /**
      * Gets the EventBus used by this gateway for internal communication.
      * 
      * @return EventBus instance

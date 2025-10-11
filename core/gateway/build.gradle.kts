@@ -6,6 +6,9 @@ dependencies {
     // Internal dependencies
     api(project(":core:eventbus"))
     
+    // Agrona for zero-copy buffers and object pooling
+    implementation("org.agrona:agrona:1.21.1")
+    
     // QuickFIX/J for FIX protocol
     implementation("org.quickfixj:quickfixj-core:2.3.1")
     implementation("org.quickfixj:quickfixj-messages-all:2.3.1")
@@ -43,5 +46,20 @@ tasks.test {
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+// JMH benchmark task
+tasks.register<JavaExec>("jmh") {
+    group = "benchmark"
+    description = "Run JMH benchmarks"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.openjdk.jmh.Main")
+    
+    // Default to all benchmarks, can be overridden with -Pargs="pattern"
+    args = if (project.hasProperty("args")) {
+        listOf(project.property("args").toString())
+    } else {
+        listOf(".*Benchmark.*")
     }
 }
