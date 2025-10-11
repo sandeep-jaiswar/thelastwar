@@ -129,7 +129,7 @@ cp docs/gateway_alerts.yml /path/to/prometheus/
 
 ```bash
 cd /path/to/prometheus
-./prometheus --config.file=prometheus.yml
+./prometheus --config.file=/path/to/prometheus/prometheus.yml
 ```
 
 ### 3. Check Targets
@@ -212,7 +212,7 @@ Verify all alerts are loaded:
 - HighSessionChurn
 - HighBackpressureEvents
 - PrometheusScrapeFailed
-- LowScrapeSucessRate
+- LowScrapeSuccessRate
 
 ### 2. Test Alert Triggering
 
@@ -296,11 +296,16 @@ Use this checklist to validate all acceptance criteria:
 ## Performance Impact
 
 The metrics collection has minimal performance impact:
-- **CPU overhead**: < 0.1% per metric recording
-- **Memory overhead**: ~1KB per unique metric time series
-- **Latency overhead**: < 1µs per metric recording
+- **CPU overhead**: < 0.1% per metric recording (typical JVM overhead)
+- **Memory overhead**: Varies by cardinality:
+  - Base metrics: ~1KB per unique metric time series
+  - With high cardinality tags: 10-100KB per time series
+  - Estimated total for all gateways: 5-50MB depending on active sessions
+- **Latency overhead**: < 1µs per metric recording (in-memory counter increment)
 
 The Prometheus scrape occurs every 5 seconds and takes < 10ms per gateway.
+
+**Note**: Memory usage scales with the number of unique tag combinations. For example, if you have 1000 unique session IDs as tags, memory usage will be proportionally higher. Use tags judiciously and consider aggregating high-cardinality dimensions.
 
 ## References
 

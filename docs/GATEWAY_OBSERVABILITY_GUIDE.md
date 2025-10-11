@@ -233,7 +233,7 @@ The Gateway Health & Observability Dashboard includes:
 ### Scrape Health Alerts
 
 - **PrometheusScrapeFailed** - Fires when Prometheus fails to scrape gateway for 2 minutes
-- **LowScrapeSucessRate** - Fires when scrape success rate < 99% for 5 minutes
+- **LowScrapeSuccessRate** - Fires when scrape success rate < 99% for 5 minutes
 
 ## Acceptance Criteria Validation
 

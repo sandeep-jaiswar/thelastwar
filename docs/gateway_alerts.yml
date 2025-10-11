@@ -158,7 +158,7 @@ groups:
           description: "Prometheus has failed to scrape metrics from {{ $labels.job }} ({{ $labels.instance }}) for 2 minutes"
           
       # Alert when scrape success rate drops below 100%
-      - alert: LowScrapeSucessRate
+      - alert: LowScrapeSuccessRate
         expr: rate(up{job=~".*gateway"}[5m]) < 0.99
         for: 5m
         labels:
