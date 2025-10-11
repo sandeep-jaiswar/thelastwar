@@ -202,6 +202,29 @@ public class WebSocketGateway implements GatewayAdapter {
     }
     
     @Override
+    public boolean send(com.thelastwar.gateway.MessageEnvelope envelope) {
+        // WebSocket gateway primarily broadcasts events via EventBus subscription
+        // This method could be used for direct message sending if needed
+        if (envelope == null || !running.get()) {
+            return false;
+        }
+        
+        // Log for now - can be extended to send to specific sessions
+        LOGGER.fine("MessageEnvelope send called for WebSocket gateway");
+        return false;
+    }
+    
+    @Override
+    public void onMessage(com.thelastwar.gateway.MessageEnvelope envelope) {
+        // WebSocket gateway receives messages from clients via WebSocket protocol
+        // This callback is not typically used for WebSocket gateway
+        // as messages come through WebSocketServerHandler
+        if (envelope != null) {
+            LOGGER.fine("MessageEnvelope received: " + envelope.getProtocolType());
+        }
+    }
+    
+    @Override
     public EventBus getEventBus() {
         return eventBus;
     }
