@@ -30,57 +30,57 @@ class OrderTest {
     @Test
     void testInvalidOrderId() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(0L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+            new Order(0L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
         
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(-1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+            new Order(-1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
     }
     
     @Test
     void testInvalidSymbol() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, null, Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+            new Order(12345L, null, Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
         
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+            new Order(12345L, "", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
     }
     
     @Test
     void testInvalidSide() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "AAPL", (byte) 0, 15000L, 100L, System.nanoTime());
+            new Order(12345L, "AAPL", (byte) 0, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
         
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "AAPL", (byte) 3, 15000L, 100L, System.nanoTime());
+            new Order(12345L, "AAPL", (byte) 3, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
     }
     
     @Test
     void testInvalidQuantity() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 0L, System.nanoTime());
+            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 0L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
         
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, -1L, System.nanoTime());
+            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, -1L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         });
     }
     
     @Test
     void testInvalidTimestamp() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, -1L);
+            new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, -1L, Order.TYPE_LIMIT, Order.TIF_GTC);
         });
     }
     
     @Test
     void testWithQuantity() {
-        Order order = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         Order updated = order.withQuantity(50L);
         
         assertEquals(12345L, updated.orderId());
@@ -93,22 +93,22 @@ class OrderTest {
     
     @Test
     void testIsBuy() {
-        Order buyOrder = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order buyOrder = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(buyOrder.isBuy());
         assertFalse(buyOrder.isSell());
     }
     
     @Test
     void testIsSell() {
-        Order sellOrder = new Order(12345L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime());
+        Order sellOrder = new Order(12345L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(sellOrder.isSell());
         assertFalse(sellOrder.isBuy());
     }
     
     @Test
     void testImmutability() {
-        Order order1 = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order1 = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(12345L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         assertEquals(order1, order2);
         assertEquals(order1.hashCode(), order2.hashCode());

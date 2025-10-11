@@ -96,20 +96,20 @@ public class OrderBookExample {
         // Add multiple orders at the same price with different timestamps
         System.out.println("Adding 3 orders at the same price ($150.00):");
         
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, price, 100L, 1000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, price, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order1);
         System.out.println("  Order 1: timestamp=1000, qty=100");
         
         // Wait a bit to ensure different timestamp
         try { Thread.sleep(1); } catch (InterruptedException e) {}
         
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, price, 200L, 2000L);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, price, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order2);
         System.out.println("  Order 2: timestamp=2000, qty=200");
         
         try { Thread.sleep(1); } catch (InterruptedException e) {}
         
-        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, price, 150L, 3000L);
+        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, price, 150L, 3000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order3);
         System.out.println("  Order 3: timestamp=3000, qty=150");
         
@@ -203,16 +203,16 @@ public class OrderBookExample {
         
         // Market open: Initial liquidity providers
         System.out.println("Market opens with initial orders:");
-        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 14990L, 500L, System.nanoTime()));
-        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 14980L, 300L, System.nanoTime()));
-        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_SELL, 15010L, 500L, System.nanoTime()));
-        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_SELL, 15020L, 300L, System.nanoTime()));
+        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 14990L, 500L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 14980L, 300L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_SELL, 15010L, 500L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_SELL, 15020L, 300L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         printMarketState(book, "Initial state");
         
         // Aggressive buyer enters
         System.out.println("\nAggressive buyer improves bid:");
-        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime()));
+        book.addOrder(new Order(orderId++, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         printMarketState(book, "After aggressive bid");
         
         // Some orders get cancelled
