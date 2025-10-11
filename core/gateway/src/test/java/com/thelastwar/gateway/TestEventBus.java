@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Simple in-memory EventBus stub for gateway testing.
  */
-class TestEventBus implements EventBus {
+public class TestEventBus implements EventBus {
     
     private final List<HandlerRegistration>[] handlers;
     private final AtomicLong publishedCount = new AtomicLong(0);
