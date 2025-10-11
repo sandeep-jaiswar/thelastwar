@@ -232,7 +232,7 @@ class OffHeapOrderBookTest {
         for (long i = 1; i <= 10000; i++) {
             Order order = new Order(i, "AAPL", 
                 i % 2 == 0 ? Order.SIDE_BUY : Order.SIDE_SELL,
-                15000L + (i % 100), 100L, System.nanoTime());
+                15000L + (i % 100), 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
             book.addOrder(order);
         }
         

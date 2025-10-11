@@ -16,7 +16,9 @@ class OrderTest {
                 Order.SIDE_BUY,
                 15000L,
                 100L,
-                System.nanoTime()
+                System.nanoTime(),
+                Order.TYPE_LIMIT,
+                Order.TIF_GTC
         );
         
         assertEquals(12345L, order.orderId());

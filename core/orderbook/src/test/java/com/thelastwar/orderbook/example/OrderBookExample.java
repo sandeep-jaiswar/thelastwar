@@ -43,7 +43,9 @@ public class OrderBookExample {
                 Order.SIDE_BUY,     // side
                 15000L,             // price ($150.00 in cents)
                 100L,               // quantity
-                System.nanoTime()   // timestamp
+                System.nanoTime(),  // timestamp
+                Order.TYPE_LIMIT,    // orderType
+                Order.TIF_GTC        // timeInForce
         );
         book.addOrder(buyOrder);
         System.out.println("Added buy order: ID=" + buyOrder.orderId() + 
@@ -57,7 +59,9 @@ public class OrderBookExample {
                 Order.SIDE_SELL,
                 15100L,             // price ($151.00 in cents)
                 150L,
-                System.nanoTime()
+                System.nanoTime(),
+                Order.TYPE_LIMIT,
+                Order.TIF_GTC
         );
         book.addOrder(sellOrder);
         System.out.println("Added sell order: ID=" + sellOrder.orderId() + 
@@ -150,7 +154,9 @@ public class OrderBookExample {
                     Order.SIDE_BUY,
                     basePrice - i * 10L,
                     100L * (i + 1),
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         }
         
@@ -162,7 +168,9 @@ public class OrderBookExample {
                     Order.SIDE_SELL,
                     basePrice + 10L + i * 10L,
                     100L * (i + 1),
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         }
         
