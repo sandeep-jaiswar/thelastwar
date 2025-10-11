@@ -20,7 +20,7 @@ The MessageEnvelope API provides a unified message format for all gateway implem
 A POJO representing a unified message format across all gateways.
 
 **Fields:**
-- `protocolType`: Protocol type (FIX, REST, WEBSOCKET)
+- `protocolType`: Protocol type (FIX, REST, WebSocket)
 - `correlationId`: Unique identifier for request-response tracking
 - `payload`: Message payload as DirectBuffer (zero-copy)
 - `timestamp`: Message timestamp in nanoseconds
@@ -276,11 +276,12 @@ public class RestGateway implements GatewayAdapter {
     public Mono<ResponseEntity<String>> submitOrder(@RequestBody OrderRequest request) {
         MessageEnvelope envelope = pool.acquire();
         try {
+            byte[] serialized = serializeOrder(request);
             envelope.setProtocolType(MessageEnvelope.ProtocolType.REST)
                 .setCorrelationId(generateCorrelationId())
                 .setTimestamp(System.nanoTime())
                 .setClientId(request.getClientId())
-                .setPayload(serializeOrder(request), 0, serialized.length);
+                .setPayload(serialized, 0, serialized.length);
             
             send(envelope);
             return Mono.just(ResponseEntity.ok("Order submitted"));
@@ -324,10 +325,10 @@ public class RestGateway implements GatewayAdapter {
 ## API Reference
 
 See JavaDoc for detailed API documentation:
-- [MessageEnvelope](../src/main/java/com/thelastwar/gateway/MessageEnvelope.java)
-- [MessageEnvelopePool](../src/main/java/com/thelastwar/gateway/MessageEnvelopePool.java)
-- [MessageEnvelopeSerializer](../src/main/java/com/thelastwar/gateway/MessageEnvelopeSerializer.java)
-- [GatewayAdapter](../src/main/java/com/thelastwar/gateway/GatewayAdapter.java)
+- [MessageEnvelope](src/main/java/com/thelastwar/gateway/MessageEnvelope.java)
+- [MessageEnvelopePool](src/main/java/com/thelastwar/gateway/MessageEnvelopePool.java)
+- [MessageEnvelopeSerializer](src/main/java/com/thelastwar/gateway/MessageEnvelopeSerializer.java)
+- [GatewayAdapter](src/main/java/com/thelastwar/gateway/GatewayAdapter.java)
 
 ## Running Benchmarks
 
