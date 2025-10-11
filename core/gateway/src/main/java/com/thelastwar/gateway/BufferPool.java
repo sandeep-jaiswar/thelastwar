@@ -56,7 +56,11 @@ public class BufferPool {
         
         // Pre-allocate all buffers
         for (int i = 0; i < poolCapacity; i++) {
-            pool.offer(ByteBuffer.allocateDirect(bufferSize));
+            boolean added = pool.offer(ByteBuffer.allocateDirect(bufferSize));
+            if (!added) {
+                throw new IllegalStateException(
+                    "Failed to pre-allocate buffer " + i + " of " + poolCapacity);
+            }
         }
     }
     
