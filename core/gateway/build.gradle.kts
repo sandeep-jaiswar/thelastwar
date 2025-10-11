@@ -1,0 +1,47 @@
+plugins {
+    id("java-library")
+}
+
+dependencies {
+    // Internal dependencies
+    api(project(":core:eventbus"))
+    
+    // QuickFIX/J for FIX protocol
+    implementation("org.quickfixj:quickfixj-core:2.3.1")
+    implementation("org.quickfixj:quickfixj-messages-all:2.3.1")
+    
+    // Micrometer for metrics
+    implementation("io.micrometer:micrometer-core:1.11.0")
+    
+    // SLF4J for logging
+    implementation("org.slf4j:slf4j-api:2.0.7")
+    implementation("org.slf4j:slf4j-simple:2.0.7")
+    
+    // Testing
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    
+    // Mockito for mocking
+    testImplementation("org.mockito:mockito-core:5.3.1")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.3.1")
+    
+    // JMH for benchmarking
+    testImplementation("org.openjdk.jmh:jmh-core:1.37")
+    testAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:1.37")
+}
+
+tasks.test {
+    useJUnitPlatform()
+    maxHeapSize = "1g"
+    
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = false
+    }
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
