@@ -32,6 +32,30 @@ The Cache Reconciliation Service provides periodic validation of the off-heap ca
 
 ## Architecture
 
+### Current Implementation Scope
+
+The initial implementation focuses on:
+1. **Infrastructure readiness**: Complete reconciliation framework
+2. **Snapshot validation**: Detects corruption in snapshot/restore cycle
+3. **Correction mechanism**: Zero-downtime atomic updates
+4. **Audit logging**: Complete diff tracking
+5. **Metrics & monitoring**: Production-ready observability
+
+**Note on Drift Detection:**
+The current implementation validates snapshot consistency rather than comparing against a separate event log replay. This is because:
+- The existing EventBus replay mechanism doesn't support isolated replay into a temp engine
+- A full implementation would require a persistent event log separate from the in-memory event bus
+- The current approach still provides value by validating snapshot integrity
+
+**Future Enhancement:**
+When a persistent event log is added, the `rebuildFromEventLog()` method can be enhanced to:
+1. Read from persistent event log
+2. Replay into isolated engine instance  
+3. Compare rebuilt state vs current state
+4. Detect true drift between log and cache
+
+The infrastructure is ready for this upgrade - only the replay mechanism needs enhancement.
+
 ### Components
 
 1. **CacheReconciliationService**
@@ -200,10 +224,20 @@ See `CacheReconciliationExample.java` for comprehensive usage demonstration.
 - **Verification:** Tested in "Zero downtime" test
 
 ### 4. Comparison Strategy
-- **Current approach:** Snapshot-based comparison
-- **Future enhancement:** Could use event replay for full validation
-- **Trade-off:** Speed vs. completeness
-- **Current state:** Sufficient for drift detection
+- **Current approach:** Snapshot-based consistency validation
+- **Rationale:** Validates snapshot/restore integrity without full replay
+- **Benefits:** 
+  - Detects corruption in snapshot/restore cycle
+  - Tests reconciliation infrastructure
+  - Lower overhead than full replay
+- **Future enhancement:** 
+  - Integrate with persistent event log
+  - Full event replay for drift detection
+  - Compare rebuilt state vs current state
+- **Current value:** 
+  - Infrastructure is ready for full replay
+  - Validates the correction mechanism works
+  - Detects snapshot integrity issues
 
 ## Integration Points
 

@@ -160,15 +160,17 @@ class CacheReconciliationServiceTest {
     @Test
     @DisplayName("Service handles multiple reconciliation cycles")
     void testMultipleReconciliationCycles() {
+        // Use shorter interval for faster test
+        service = new CacheReconciliationService(engine, eventBus, meterRegistry, 2000L);
         service.start();
         
-        // Wait for multiple reconciliation cycles (5s interval)
-        sleep(12000); // Should run at least 2 cycles
+        // Wait for multiple reconciliation cycles (2s interval)
+        sleep(5000); // Should run at least 2 cycles
         
         // Verify multiple reconciliations occurred
         CacheReconciliationService.ReconciliationMetrics metrics = service.getMetrics();
         assertTrue(metrics.totalReconciliations() >= 2, 
-            "Should have at least 2 reconciliations after 12s with 5s interval");
+            "Should have at least 2 reconciliations after 5s with 2s interval, got: " + metrics.totalReconciliations());
         
         service.stop();
     }
