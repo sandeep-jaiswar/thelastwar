@@ -139,7 +139,7 @@ public class OffHeapOrderBookExample {
         long updateTime = System.nanoTime() - startTime;
         
         System.out.println("Added 1000 orders in: " + (addTime / 1000.0) + " µs");
-        System.out.println("Average add time: " + (addTime / 1000.0) + " ns/order");
+        System.out.println("Average add time: " + (addTime / 1000) + " ns/order");
         System.out.println("10,000 best bid/ask lookups in: " + (lookupTime / 1000.0) + " µs");
         System.out.println("Average lookup time: " + (lookupTime / 20000.0) + " ns");
         System.out.println("100 order updates in: " + (updateTime / 1000.0) + " µs");
