@@ -202,7 +202,7 @@ class FixGatewayIntegrationTest {
         double messagesPerSecond = (messageCount * 1_000_000_000.0) / duration;
         
         System.out.printf("Throughput: %.0f msgs/sec\n", messagesPerSecond);
-        System.out.printf("Average latency: %.2f µs\n", duration / (messageCount * 1000.0));
+        System.out.printf("Average latency: %.2f µs\n", (duration / messageCount) / 1000.0);
         
         // Verify reasonable throughput
         // Note: Without real server connection, throughput will be limited by network timeouts
@@ -226,7 +226,6 @@ class FixGatewayIntegrationTest {
         settings.setString("HeartBtInt", "30");
         settings.setString("SocketConnectHost", "localhost");
         settings.setString("SocketConnectPort", String.valueOf(SERVER_PORT));
-        settings.setString("SocketConnectHost", "localhost");
         settings.setString("ResetOnLogon", "Y");
         settings.setString("ResetOnLogout", "Y");
         settings.setString("ResetOnDisconnect", "Y");
