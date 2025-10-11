@@ -14,6 +14,8 @@ The REST Gateway provides high-performance REST endpoints for external order sub
 - **EventBus Integration**: Asynchronous order dispatch via internal EventBus
 - **Ultra-fast serialization**: DSL-JSON for < 10 µs JSON operations
 
+⚠️ **Important Production Consideration**: The current implementation uses in-memory state for order storage. This means **order data is lost on application restart**. For production deployments, integrate with Redis, a distributed cache, or a database for persistent order state. See the "Known Limitations" section below for details.
+
 ## Architecture
 
 ```
@@ -52,6 +54,14 @@ Content-Type: application/json
   "account": 999
 }
 ```
+
+**Request Fields:**
+- `symbol` (string, required): Trading symbol/instrument (e.g., "AAPL", "MSFT")
+- `side` (string, required): Order side - "BUY" or "SELL"
+- `orderType` (string, required): Order type - "MARKET", "LIMIT", "STOP", or "STOP_LIMIT"
+- `quantity` (long, required): Order quantity in shares/lots (must be positive)
+- `price` (long, required): Price in minimum increments (0 for market orders)
+- `account` (long, required): Trading account identifier (numeric ID)
 
 **Response:**
 ```json
@@ -227,8 +237,9 @@ Downstream services (Matching Engine, Risk Manager) subscribe to these events fo
 
 ## Error Handling
 
-The API returns consistent error responses:
+The API returns structured error responses with appropriate HTTP status codes:
 
+**Validation Error (400 Bad Request):**
 ```json
 {
   "success": false,
@@ -239,10 +250,13 @@ The API returns consistent error responses:
 ```
 
 Common error scenarios:
-- **Invalid request**: HTTP 200 with `success: false`
+- **Invalid request**: HTTP 400 Bad Request with detailed error message
 - **Authentication failure**: HTTP 401 Unauthorized
 - **Rate limit exceeded**: HTTP 429 Too Many Requests
+- **Order not found**: HTTP 404 Not Found
 - **Server error**: HTTP 500 Internal Server Error
+
+**Note**: Currently, validation errors return HTTP 200 with `success: false` for backward compatibility. This will be changed to proper 4xx status codes in a future release.
 
 ## Dependencies
 
@@ -272,6 +286,40 @@ The gateway integrates with Micrometer for metrics:
 - Active connections
 
 Metrics can be exposed via Prometheus or other monitoring systems.
+
+## Known Limitations
+
+⚠️ **Critical Production Considerations:**
+
+1. **In-Memory State (HIGH PRIORITY)**: Order state is stored in-memory using ConcurrentHashMap
+   - **Impact**: All order data is lost when the application restarts
+   - **Implication**: No order persistence, no disaster recovery, no horizontal scaling
+   - **Solution**: Replace with Redis, Hazelcast, or a persistent database
+   - **Example**: Use Spring Data Redis with RedisTemplate or ReactiveRedisTemplate
+   ```java
+   // Production-ready approach
+   @Autowired
+   private ReactiveRedisTemplate<String, OrderEvent> redisTemplate;
+   
+   public Mono<OrderEvent> getOrder(long orderId) {
+       return redisTemplate.opsForValue().get("order:" + orderId);
+   }
+   ```
+
+2. **No WebSocket Support**: No real-time updates for order status changes
+   - **Solution**: Add WebSocket endpoints for streaming updates
+
+3. **Single Node Limitation**: No horizontal scalability without external state store
+   - **Solution**: Add session affinity or use distributed state management
+
+4. **Basic Authentication**: Only JWT, no OAuth2/OIDC support
+   - **Solution**: Integrate Spring Security OAuth2
+
+5. **No API Versioning**: Single API version, breaking changes affect all clients
+   - **Solution**: Add `/v1/` prefix and implement versioning strategy
+
+6. **Status Code Inconsistency**: Validation errors currently return 200 with `success: false`
+   - **Solution**: Return proper 4xx status codes (400 for validation errors)
 
 ## Future Enhancements
 
