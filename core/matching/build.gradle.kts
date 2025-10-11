@@ -27,6 +27,35 @@ tasks.test {
     }
 }
 
+// JMH benchmark task with optimized settings
+tasks.register<JavaExec>("jmh") {
+    group = "benchmark"
+    description = "Run JMH benchmarks for matching engine"
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("org.openjdk.jmh.Main")
+    
+    // Memory settings to prevent OOM
+    jvmArgs(
+        "-Xms512m",
+        "-Xmx1g",
+        "-XX:+UseG1GC"
+    )
+    
+    // Default to CacheWarmingServiceBenchmark, can be overridden with -Pargs="pattern"
+    args = if (project.hasProperty("args")) {
+        listOf(project.property("args").toString())
+    } else {
+        listOf(
+            "CacheWarmingServiceBenchmark",
+            "-wi", "2",  // 2 warmup iterations
+            "-i", "3",   // 3 measurement iterations
+            "-f", "1",   // 1 fork
+            "-r", "500ms",  // 500ms per iteration
+            "-w", "500ms"   // 500ms warmup
+        )
+    }
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(25))
