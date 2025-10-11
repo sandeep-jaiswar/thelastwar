@@ -18,42 +18,44 @@ import java.util.Map;
  * - Efficient field ordering
  */
 public class JsonWebSocketSerializer implements WebSocketMessageSerializer {
-    
+    private static final String KEY_TIMESTAMP = "timestamp";
+    private static final String KEY_PAYLOAD = "payload";
+
     private final ObjectMapper mapper;
-    
+
     public JsonWebSocketSerializer() {
         this.mapper = new ObjectMapper();
         // Configure for performance
         mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
-    
+
     @Override
     public byte[] serialize(Event event) throws SerializationException {
         try {
             Map<String, Object> eventMap = new HashMap<>();
-            eventMap.put("timestamp", event.timestamp());
+            eventMap.put(KEY_TIMESTAMP, event.timestamp());
             eventMap.put("sequence", event.sequence());
             eventMap.put("sourceId", event.sourceId());
             eventMap.put("eventType", event.eventType());
             eventMap.put("header", event.header());
-            
+
             // Serialize payload based on type
             Object payload = event.payload();
-            if (payload instanceof OrderEvent) {
-                eventMap.put("payload", serializeOrderEventToMap((OrderEvent) payload));
-            } else if (payload instanceof ExecutionEvent) {
-                eventMap.put("payload", serializeExecutionEventToMap((ExecutionEvent) payload));
+            if (payload instanceof OrderEvent ord) {
+                eventMap.put(KEY_PAYLOAD, serializeOrderEventToMap(ord));
+            } else if (payload instanceof ExecutionEvent ex) {
+                eventMap.put(KEY_PAYLOAD, serializeExecutionEventToMap(ex));
             } else if (payload != null) {
-                eventMap.put("payload", payload);
+                eventMap.put(KEY_PAYLOAD, payload);
             }
-            
+
             return mapper.writeValueAsBytes(eventMap);
         } catch (Exception e) {
             throw new SerializationException("Failed to serialize event", e);
         }
     }
-    
+
     @Override
     public byte[] serializeOrderEvent(OrderEvent orderEvent) throws SerializationException {
         try {
@@ -62,7 +64,7 @@ public class JsonWebSocketSerializer implements WebSocketMessageSerializer {
             throw new SerializationException("Failed to serialize OrderEvent", e);
         }
     }
-    
+
     @Override
     public byte[] serializeExecutionEvent(ExecutionEvent executionEvent) throws SerializationException {
         try {
@@ -71,7 +73,7 @@ public class JsonWebSocketSerializer implements WebSocketMessageSerializer {
             throw new SerializationException("Failed to serialize ExecutionEvent", e);
         }
     }
-    
+
     private Map<String, Object> serializeOrderEventToMap(OrderEvent order) {
         Map<String, Object> map = new HashMap<>();
         map.put("orderId", order.orderId());
@@ -80,13 +82,13 @@ public class JsonWebSocketSerializer implements WebSocketMessageSerializer {
         map.put("orderType", order.orderType());
         map.put("quantity", order.quantity());
         map.put("price", order.price());
-        map.put("timestamp", order.timestamp());
+        map.put(KEY_TIMESTAMP, order.timestamp());
         map.put("status", order.status());
         map.put("account", order.account());
         map.put("exchange", order.exchange());
         return map;
     }
-    
+
     private Map<String, Object> serializeExecutionEventToMap(ExecutionEvent exec) {
         Map<String, Object> map = new HashMap<>();
         map.put("executionId", exec.executionId());
@@ -99,28 +101,28 @@ public class JsonWebSocketSerializer implements WebSocketMessageSerializer {
         map.put("lastPrice", exec.lastPrice());
         map.put("cumulativeQty", exec.cumulativeQty());
         map.put("leavesQuantity", exec.leavesQuantity());
-        map.put("timestamp", exec.timestamp());
+        map.put(KEY_TIMESTAMP, exec.timestamp());
         map.put("account", exec.account());
         map.put("exchange", exec.exchange());
         map.put("rejectReason", exec.rejectReason());
         return map;
     }
-    
+
     @Override
     @SuppressWarnings("unchecked")
     public WebSocketMessage deserialize(byte[] data) throws SerializationException {
         try {
             Map<String, Object> messageMap = mapper.readValue(data, Map.class);
             String typeStr = (String) messageMap.get("type");
-            Object payload = messageMap.get("payload");
-            
+            Object payload = messageMap.get(KEY_PAYLOAD);
+
             WebSocketMessage.MessageType type = WebSocketMessage.MessageType.valueOf(typeStr);
             return new WebSocketMessage(type, payload);
         } catch (Exception e) {
             throw new SerializationException("Failed to deserialize message", e);
         }
     }
-    
+
     @Override
     public TransportFormat getFormat() {
         return TransportFormat.JSON;
