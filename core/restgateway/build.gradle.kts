@@ -24,10 +24,6 @@ dependencies {
     // Micrometer for metrics
     implementation("io.micrometer:micrometer-core:1.11.0")
     
-    // SLF4J for logging
-    implementation("org.slf4j:slf4j-api:2.0.7")
-    implementation("org.slf4j:slf4j-simple:2.0.7")
-    
     // Testing
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
