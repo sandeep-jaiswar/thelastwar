@@ -1,0 +1,533 @@
+{
+  "dashboard": {
+    "title": "Gateway Health & Observability Dashboard",
+    "tags": ["gateway", "observability", "metrics", "latency", "throughput"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Gateway Message Throughput (Total)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(gateway_messages_inbound_total[1m])",
+            "legendFormat": "{{gateway}} - Inbound/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(gateway_messages_outbound_total[1m])",
+            "legendFormat": "{{gateway}} - Outbound/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(wsgateway_messages_inbound_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Inbound/sec",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(wsgateway_messages_outbound_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Outbound/sec",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Messages per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Sessions / Connections",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "gateway_sessions_active",
+            "legendFormat": "{{gateway}} - Active Sessions",
+            "refId": "A"
+          },
+          {
+            "expr": "wsgateway_clients_concurrent",
+            "legendFormat": "{{gateway}} (WS) - Concurrent Clients",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Active Connections"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 3,
+        "title": "Gateway Latency Distribution (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(gateway_decode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Decode - p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(gateway_decode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Decode - p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(gateway_decode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Decode - p99",
+            "refId": "C"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(gateway_encode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Encode - p50",
+            "refId": "D"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(gateway_encode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Encode - p95",
+            "refId": "E"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(gateway_encode_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Encode - p99",
+            "refId": "F"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 0,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        },
+        "alert": {
+          "name": "High Gateway p99 Latency",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.001],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["C", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "Gateway p99 decode latency exceeded 1ms threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "WebSocket Gateway Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(wsgateway_broadcast_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Broadcast - p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(wsgateway_broadcast_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Broadcast - p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(wsgateway_broadcast_latency_seconds_bucket[1m]))",
+            "legendFormat": "{{gateway}} Broadcast - p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Latency"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 0,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        },
+        "alert": {
+          "name": "High WebSocket p99 Latency",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.001],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["C", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "message": "WebSocket gateway p99 broadcast latency exceeded 1ms threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Rate (All Gateways)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(gateway_errors_decode_total[1m])",
+            "legendFormat": "{{gateway}} - Decode Errors/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(gateway_errors_encode_total[1m])",
+            "legendFormat": "{{gateway}} - Encode Errors/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(wsgateway_serialization_errors_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Serialization Errors/sec",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(wsgateway_backpressure_events_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Backpressure Events/sec",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Errors per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 6,
+        "title": "Queue Depth",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 16,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "gateway_queue_inbound",
+            "legendFormat": "{{gateway}} - Inbound Queue",
+            "refId": "A"
+          },
+          {
+            "expr": "gateway_queue_outbound",
+            "legendFormat": "{{gateway}} - Outbound Queue",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Queue Depth"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 7,
+        "title": "P99 Latency vs SLA Target",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(gateway_decode_latency_seconds_bucket[1m])) * 1000",
+            "legendFormat": "{{gateway}} - p99 Latency (ms)",
+            "refId": "A"
+          },
+          {
+            "expr": "1",
+            "legendFormat": "SLA Target (1ms)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ms",
+            "label": "Latency (milliseconds)",
+            "min": 0
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 0,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        },
+        "thresholds": [
+          {
+            "value": 1,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Session Lifecycle Events",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(gateway_sessions_connects_total[1m])",
+            "legendFormat": "{{gateway}} - Connects/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(gateway_sessions_disconnects_total[1m])",
+            "legendFormat": "{{gateway}} - Disconnects/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(wsgateway_connections_opened_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Opened/sec",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(wsgateway_connections_closed_total[1m])",
+            "legendFormat": "{{gateway}} (WS) - Closed/sec",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "Events per second"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "xaxis": {
+          "show": true
+        },
+        "lines": true,
+        "fill": 1,
+        "linewidth": 2,
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      }
+    ]
+  }
+}

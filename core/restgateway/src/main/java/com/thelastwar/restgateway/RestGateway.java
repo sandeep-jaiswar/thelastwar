@@ -2,6 +2,9 @@ package com.thelastwar.restgateway;
 
 import com.thelastwar.eventbus.AeronEventBus;
 import com.thelastwar.eventbus.EventBus;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.prometheus.PrometheusConfig;
+import io.micrometer.prometheus.PrometheusMeterRegistry;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -34,13 +37,22 @@ public class RestGateway {
     }
     
     /**
+     * Provides Prometheus MeterRegistry bean.
+     * This registry is used for metrics collection and export to Prometheus.
+     */
+    @Bean
+    public MeterRegistry meterRegistry() {
+        return new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+    }
+    
+    /**
      * Provides EventBus bean.
      * Uses AeronEventBus for ultra-low latency IPC communication.
      */
     @Bean
-    public EventBus eventBus() {
-        // Use AeronEventBus for production-grade ultra-low latency
-        AeronEventBus eventBus = new AeronEventBus();
+    public EventBus eventBus(MeterRegistry meterRegistry) {
+        // Use AeronEventBus for production-grade ultra-low latency with metrics
+        AeronEventBus eventBus = new AeronEventBus(meterRegistry, "rest-gateway");
         eventBus.start();
         
         // Register shutdown hook

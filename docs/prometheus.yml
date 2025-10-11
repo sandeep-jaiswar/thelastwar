@@ -1,0 +1,68 @@
+# Prometheus configuration for The Last War gateway metrics collection
+# 
+# This configuration defines:
+# - Scrape configs for all gateway types
+# - Global settings for scrape intervals
+# - Service discovery for dynamic gateway instances
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'thelastwar'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'localhost:9093'
+
+# Load alerting rules
+rule_files:
+  - 'gateway_alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # REST Gateway metrics
+  - job_name: 'rest-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'localhost:8080'
+        labels:
+          gateway_type: 'rest'
+          service: 'rest-gateway'
+    scrape_interval: 5s
+    scrape_timeout: 4s
+
+  # FIX Gateway metrics
+  - job_name: 'fix-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'localhost:8081'
+        labels:
+          gateway_type: 'fix'
+          service: 'fix-gateway'
+    scrape_interval: 5s
+    scrape_timeout: 4s
+
+  # WebSocket Gateway metrics
+  - job_name: 'websocket-gateway'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'localhost:8082'
+        labels:
+          gateway_type: 'websocket'
+          service: 'ws-gateway'
+    scrape_interval: 5s
+    scrape_timeout: 4s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
