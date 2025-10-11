@@ -13,18 +13,21 @@ import java.util.concurrent.TimeUnit;
  * - Event Bus round-trip: < 10 µs (10,000 ns)
  * - Throughput: > 2 million msgs/sec
  * 
- * Run with: mvn test-compile exec:java -Dexec.mainClass="org.openjdk.jmh.Main" -Dexec.classpathScope=test
+ * Run with: mvn test-compile exec:java -Dexec.mainClass="org.openjdk.jmh.Main"
+ * -Dexec.classpathScope=test
  * 
  * Or manually compile and run:
  * mvn clean test-compile
- * java -cp target/test-classes:target/classes:~/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar:~/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37.jar org.openjdk.jmh.Main EventBusBenchmark
+ * java -cp
+ * target/test-classes:target/classes:~/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar:~/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37.jar
+ * org.openjdk.jmh.Main EventBusBenchmark
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @Warmup(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 10, time = 1, timeUnit = TimeUnit.SECONDS)
-@Fork(value = 1, jvmArgs = {"-Xms2G", "-Xmx2G", "-XX:+UseG1GC"})
+@Fork(value = 1, jvmArgs = { "-Xms2G", "-Xmx2G", "-XX:+UseG1GC" })
 public class EventBusBenchmark {
 
     @State(Scope.Thread)
@@ -37,19 +40,18 @@ public class EventBusBenchmark {
         public void setup() {
             eventBus = new InMemoryEventBus();
             eventBus.start();
-            
+
             // Subscribe a simple handler
             eventBus.subscribe(EventType.MARKET_DATA_UPDATE, e -> eventReceived = true);
-            
+
             // Pre-create event to avoid allocation in benchmark
             event = Event.create(
-                System.nanoTime(),
-                1L,
-                SourceId.FEED_HANDLER,
-                EventType.MARKET_DATA_UPDATE,
-                0L,
-                "benchmark"
-            );
+                    System.nanoTime(),
+                    1L,
+                    SourceId.FEED_HANDLER,
+                    EventType.MARKET_DATA_UPDATE,
+                    0L,
+                    "benchmark");
         }
 
         @TearDown(Level.Trial)
@@ -75,6 +77,11 @@ public class EventBusBenchmark {
     public void benchmarkPublishAndReceive(BenchmarkState state, Blackhole blackhole) {
         state.eventReceived = false;
         state.eventBus.publish(state.event);
+        // Spin-wait until the event is received to avoid unbounded queue growth
+        while (!state.eventReceived) {
+            // Busy spin, but can add Thread.onSpinWait() for Java 9+
+            Thread.onSpinWait();
+        }
         blackhole.consume(state.eventReceived);
     }
 
@@ -83,7 +90,8 @@ public class EventBusBenchmark {
      */
     @Benchmark
     public EventBus.Subscription benchmarkSubscribe(BenchmarkState state) {
-        return state.eventBus.subscribe(EventType.ORDER_FILLED, e -> {});
+        return state.eventBus.subscribe(EventType.ORDER_FILLED, e -> {
+        });
     }
 
     /**
@@ -93,13 +101,12 @@ public class EventBusBenchmark {
     @Benchmark
     public Event benchmarkEventCreation() {
         return Event.create(
-            System.nanoTime(),
-            1L,
-            SourceId.FEED_HANDLER,
-            EventType.MARKET_DATA_UPDATE,
-            0L,
-            "data"
-        );
+                System.nanoTime(),
+                1L,
+                SourceId.FEED_HANDLER,
+                EventType.MARKET_DATA_UPDATE,
+                0L,
+                "data");
     }
 
     /**

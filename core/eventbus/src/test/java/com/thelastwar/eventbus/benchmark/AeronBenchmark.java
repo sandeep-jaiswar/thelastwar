@@ -98,11 +98,16 @@ public class AeronBenchmark {
      */
     @Benchmark
     public boolean benchmarkPublish(BenchmarkState state) {
-        // Retry until publish succeeds to ensure accurate measurement
+        state.eventReceived = false;
         while (!state.eventBus.publish(state.event)) {
             Thread.onSpinWait();
         }
-        return true;
+        // Wait for event to be consumed
+        long spinStart = System.nanoTime();
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
+            Thread.onSpinWait();
+        }
+        return state.eventReceived;
     }
 
     /**
@@ -111,11 +116,16 @@ public class AeronBenchmark {
      */
     @Benchmark
     public boolean benchmarkPublish128B(BenchmarkState state) {
-        // Retry until publish succeeds to ensure accurate measurement
+        state.eventReceived = false;
         while (!state.eventBus.publish(state.smallEvent128B)) {
             Thread.onSpinWait();
         }
-        return true;
+        // Wait for event to be consumed
+        long spinStart = System.nanoTime();
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
+            Thread.onSpinWait();
+        }
+        return state.eventReceived;
     }
 
     /**
@@ -175,8 +185,13 @@ public class AeronBenchmark {
     @BenchmarkMode(Mode.Throughput)
     @OutputTimeUnit(TimeUnit.SECONDS)
     public void benchmarkThroughput(BenchmarkState state) {
-        // Retry until publish succeeds to ensure accurate throughput measurement
+        state.eventReceived = false;
         while (!state.eventBus.publish(state.event)) {
+            Thread.onSpinWait();
+        }
+        // Wait for event to be consumed before next publish
+        long spinStart = System.nanoTime();
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
             Thread.onSpinWait();
         }
     }
@@ -189,8 +204,13 @@ public class AeronBenchmark {
     @BenchmarkMode(Mode.Throughput)
     @OutputTimeUnit(TimeUnit.SECONDS)
     public void benchmarkThroughput128B(BenchmarkState state) {
-        // Retry until publish succeeds to ensure accurate throughput measurement
+        state.eventReceived = false;
         while (!state.eventBus.publish(state.smallEvent128B)) {
+            Thread.onSpinWait();
+        }
+        // Wait for event to be consumed before next publish
+        long spinStart = System.nanoTime();
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
             Thread.onSpinWait();
         }
     }
@@ -220,8 +240,13 @@ public class AeronBenchmark {
     @Warmup(iterations = 3, time = 5, timeUnit = TimeUnit.SECONDS)
     @Measurement(iterations = 1, time = 60, timeUnit = TimeUnit.SECONDS)
     public void benchmarkSustained60Seconds(BenchmarkState state) {
-        // Retry until publish succeeds to ensure accurate throughput measurement
+        state.eventReceived = false;
         while (!state.eventBus.publish(state.smallEvent128B)) {
+            Thread.onSpinWait();
+        }
+        // Wait for event to be consumed before next publish
+        long spinStart = System.nanoTime();
+        while (!state.eventReceived && (System.nanoTime() - spinStart) < SPIN_WAIT_MAX_NS) {
             Thread.onSpinWait();
         }
     }
