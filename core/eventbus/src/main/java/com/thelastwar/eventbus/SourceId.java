@@ -11,6 +11,7 @@ public final class SourceId {
     public static final int RISK_MANAGER = 3;
     public static final int OMS = 4;
     public static final int ANALYTICS = 5;
+    public static final int REST_GATEWAY = 6;
     public static final int SYSTEM = 99;
 
     private SourceId() {
@@ -30,6 +31,7 @@ public final class SourceId {
             case RISK_MANAGER -> "RiskManager";
             case OMS -> "OMS";
             case ANALYTICS -> "Analytics";
+            case REST_GATEWAY -> "RestGateway";
             case SYSTEM -> "System";
             default -> "Unknown";
         };
