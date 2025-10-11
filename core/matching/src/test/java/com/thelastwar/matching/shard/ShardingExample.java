@@ -185,7 +185,8 @@ public class ShardingExample {
                         EventHandler<Object> h = (EventHandler<Object>) handler;
                         h.onEvent(event);
                     } catch (Exception e) {
-                        // Ignore
+                        System.err.println("Error processing event: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }

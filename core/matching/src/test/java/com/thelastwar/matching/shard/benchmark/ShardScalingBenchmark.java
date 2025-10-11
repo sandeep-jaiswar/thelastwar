@@ -128,7 +128,7 @@ public class ShardScalingBenchmark {
                         EventHandler<Object> h = (EventHandler<Object>) handler;
                         h.onEvent(event);
                     } catch (Exception e) {
-                        // Ignore
+                        System.err.println("Error in benchmark event handler: " + e.getMessage());
                     }
                 }
             }
