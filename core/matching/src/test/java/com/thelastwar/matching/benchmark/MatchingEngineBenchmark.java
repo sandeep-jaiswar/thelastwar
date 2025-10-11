@@ -154,6 +154,7 @@ public class MatchingEngineBenchmark {
     public void onCancelInterface(Blackhole bh) {
         // Add an order first
         long orderId = orderIdCounter++;
+        long requestId = orderIdCounter++;
         OrderEvent order = OrderEvent.newOrder(
             orderId, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
             50L, 14800L, 888L, 1
@@ -162,7 +163,7 @@ public class MatchingEngineBenchmark {
         engine.onNewOrder(envelope);
         
         // Now cancel it
-        OrderCancel cancel = OrderCancel.create(orderId, "AAPL", 888L, orderId);
+        OrderCancel cancel = OrderCancel.create(orderId, "AAPL", 888L, requestId);
         engine.onCancel(cancel);
         bh.consume(orderId);
     }
@@ -175,6 +176,7 @@ public class MatchingEngineBenchmark {
     public void onReplaceInterface(Blackhole bh) {
         // Add an order first
         long orderId = orderIdCounter++;
+        long requestId = orderIdCounter++;
         OrderEvent order = OrderEvent.newOrder(
             orderId, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
             50L, 14800L, 888L, 1
@@ -183,7 +185,7 @@ public class MatchingEngineBenchmark {
         engine.onNewOrder(envelope);
         
         // Now modify it
-        OrderModify modify = OrderModify.modifyPrice(orderId, "AAPL", 14850L, 888L, orderId);
+        OrderModify modify = OrderModify.modifyPrice(orderId, "AAPL", 14850L, 888L, requestId);
         engine.onReplace(modify);
         bh.consume(orderId);
     }
@@ -194,9 +196,10 @@ public class MatchingEngineBenchmark {
      */
     @Benchmark
     public void onMarketDataUpdateInterface(Blackhole bh) {
+        long sequenceNum = orderIdCounter++;
         TickEvent tick = TickEvent.create(
             "AAPL", 14900L, 15100L, 15000L,
-            1000L, 1000L, orderIdCounter++, 1
+            1000L, 1000L, sequenceNum, 1
         );
         engine.onMarketDataUpdate(tick);
         bh.consume(tick);

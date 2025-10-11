@@ -102,14 +102,12 @@ TickEvent tick = TickEvent.create(
 engine.onMarketDataUpdate(tick);
 ```
 
-### Legacy Event Bus Usage
-    TradeEvent trade = (TradeEvent) event.payload();
-    System.out.println("Trade: " + trade.tradeId() + 
-                      " @ " + trade.price() + 
-                      " x " + trade.quantity());
-});
+### Event Bus Usage (Legacy Pattern)
 
-// Publish order events
+You can also use the traditional event bus pattern:
+
+```java
+// Publish order events through EventBus
 OrderEvent order = OrderEvent.newOrder(
     12345L,           // orderId
     "AAPL",          // symbol
