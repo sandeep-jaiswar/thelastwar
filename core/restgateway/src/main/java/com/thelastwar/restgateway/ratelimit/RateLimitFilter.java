@@ -2,7 +2,6 @@ package com.thelastwar.restgateway.ratelimit;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -56,7 +55,10 @@ public class RateLimitFilter implements WebFilter {
      * Creates a new bucket with the configured rate limit.
      */
     private Bucket createBucket(String username) {
-        Bandwidth limit = Bandwidth.classic(CAPACITY, Refill.intervally(CAPACITY, REFILL_DURATION));
+        Bandwidth limit = Bandwidth.builder()
+                .capacity(CAPACITY)
+                .refillIntervally(CAPACITY, REFILL_DURATION)
+                .build();
         return Bucket.builder()
                 .addLimit(limit)
                 .build();
