@@ -131,6 +131,78 @@ public class MatchingEngineBenchmark {
     }
     
     /**
+     * Benchmark: Process order through onNewOrder interface (with OrderEnvelope).
+     * Target: < 8 µs (8000 ns) median
+     */
+    @Benchmark
+    public void onNewOrderInterface(Blackhole bh) {
+        long orderId = orderIdCounter++;
+        OrderEvent order = OrderEvent.newOrder(
+            orderId, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
+            50L, 15100L, 888L, 1
+        );
+        OrderEnvelope envelope = OrderEnvelope.wrap(order, orderId, SourceId.OMS);
+        engine.onNewOrder(envelope);
+        bh.consume(orderId);
+    }
+    
+    /**
+     * Benchmark: Cancel order through onCancel interface.
+     * Target: < 5 µs (5000 ns) median
+     */
+    @Benchmark
+    public void onCancelInterface(Blackhole bh) {
+        // Add an order first
+        long orderId = orderIdCounter++;
+        OrderEvent order = OrderEvent.newOrder(
+            orderId, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
+            50L, 14800L, 888L, 1
+        );
+        OrderEnvelope envelope = OrderEnvelope.wrap(order, orderId, SourceId.OMS);
+        engine.onNewOrder(envelope);
+        
+        // Now cancel it
+        OrderCancel cancel = OrderCancel.create(orderId, "AAPL", 888L, orderId);
+        engine.onCancel(cancel);
+        bh.consume(orderId);
+    }
+    
+    /**
+     * Benchmark: Modify order through onReplace interface.
+     * Target: < 10 µs (10000 ns) median
+     */
+    @Benchmark
+    public void onReplaceInterface(Blackhole bh) {
+        // Add an order first
+        long orderId = orderIdCounter++;
+        OrderEvent order = OrderEvent.newOrder(
+            orderId, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
+            50L, 14800L, 888L, 1
+        );
+        OrderEnvelope envelope = OrderEnvelope.wrap(order, orderId, SourceId.OMS);
+        engine.onNewOrder(envelope);
+        
+        // Now modify it
+        OrderModify modify = OrderModify.modifyPrice(orderId, "AAPL", 14850L, 888L, orderId);
+        engine.onReplace(modify);
+        bh.consume(orderId);
+    }
+    
+    /**
+     * Benchmark: Process market data tick through onMarketDataUpdate interface.
+     * Target: < 3 µs (3000 ns) median
+     */
+    @Benchmark
+    public void onMarketDataUpdateInterface(Blackhole bh) {
+        TickEvent tick = TickEvent.create(
+            "AAPL", 14900L, 15100L, 15000L,
+            1000L, 1000L, orderIdCounter++, 1
+        );
+        engine.onMarketDataUpdate(tick);
+        bh.consume(tick);
+    }
+    
+    /**
      * Simple synchronous event bus for benchmarking (no queue overhead).
      */
     private static class SimpleEventBus implements EventBus {

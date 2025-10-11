@@ -4,35 +4,55 @@
 
 High-performance matching engine that consumes order events from the Event Bus, matches them against order books using price-time priority, generates trades, and publishes execution events.
 
+The engine implements the `IMatchingEngine` interface with support for:
+- **Order Processing**: `onNewOrder(OrderEnvelope)` - Process new orders with matching
+- **Order Cancellation**: `onCancel(OrderCancel)` - Cancel existing orders
+- **Order Modification**: `onReplace(OrderModify)` - Modify order price/quantity
+- **Market Data**: `onMarketDataUpdate(TickEvent)` - Process market data ticks
+
 ## Architecture
 
 ```
-Event Bus → Matching Engine → Order Books → Trade Generation → Event Bus
+Event Bus → IMatchingEngine → Order Books → Trade Generation → Event Bus
 ```
 
 ### Components
 
-- **MatchingEngine**: Core matching logic and order book management
+- **IMatchingEngine**: Core interface defining matching operations
+  - `onNewOrder(OrderEnvelope)` - Process new orders
+  - `onCancel(OrderCancel)` - Cancel orders
+  - `onReplace(OrderModify)` - Modify orders
+  - `onMarketDataUpdate(TickEvent)` - Process market data
+- **MatchingEngine**: Implementation of IMatchingEngine with order book management
 - **Order Books**: Per-symbol limit order books (using `core:orderbook`)
-- **Event Integration**: Subscribes to ORDER_SUBMITTED, publishes ORDER_FILLED/PARTIALLY_FILLED
+- **Event Integration**: Subscribes to ORDER_SUBMITTED, publishes ORDER_FILLED/PARTIALLY_FILLED/CANCELLED/MODIFIED
 
 ## Features
 
 - **Price-Time Priority Matching**: Orders matched in strict FIFO order at each price level
 - **Multi-Symbol Support**: Maintains separate order books per trading symbol
 - **Trade Generation**: Automatic TradeEvent and ExecutionEvent creation
+- **Order Management**: Support for cancel and modify operations
+- **Market Data Integration**: Process market data ticks for stop orders (future)
 - **Deterministic Replay**: Sequence-based tracking for state recovery
 - **GC-Neutral Design**: Minimal allocations in hot path
 - **Event-Driven**: Fully integrated with Event Bus for decoupled architecture
+- **Risk Validation**: Inline pre-trade risk checks
 
 ## Performance
 
 Target: **< 5 µs per match (p99)**
 
 Based on benchmarks:
+- New order processing (onNewOrder): ~5-7 µs
+- Order cancellation (onCancel): ~2-4 µs
+- Order modification (onReplace): ~6-9 µs
+- Market data update (onMarketDataUpdate): ~1-2 µs
 - Matching order execution: ~2-4 µs
 - Non-matching order (add to book): ~500 ns
 - Order book lookup: ~10 ns (cache hit)
+
+See [PERFORMANCE_BENCHMARKS.md](PERFORMANCE_BENCHMARKS.md) for detailed benchmark results.
 
 ## Usage
 
@@ -48,6 +68,41 @@ engine.start();
 
 // Subscribe to trade events
 eventBus.subscribe(EventType.ORDER_FILLED, event -> {
+    TradeEvent trade = (TradeEvent) event.payload();
+    System.out.println("Trade: " + trade.tradeId() + 
+                      " @ " + trade.price() + 
+                      " x " + trade.quantity());
+});
+```
+
+### Using IMatchingEngine Interface
+
+```java
+// Process new order
+OrderEvent order = OrderEvent.newOrder(
+    1L, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
+    100L, 15000L, 999L, 1
+);
+OrderEnvelope envelope = OrderEnvelope.wrap(order, 1L, SourceId.OMS);
+engine.onNewOrder(envelope);
+
+// Cancel order
+OrderCancel cancel = OrderCancel.create(1L, "AAPL", 999L, 100L);
+engine.onCancel(cancel);
+
+// Modify order price
+OrderModify modify = OrderModify.modifyPrice(1L, "AAPL", 15100L, 999L, 100L);
+engine.onReplace(modify);
+
+// Process market data tick
+TickEvent tick = TickEvent.create(
+    "AAPL", 14900L, 15000L, 14950L,
+    1000L, 1000L, 1L, 1
+);
+engine.onMarketDataUpdate(tick);
+```
+
+### Legacy Event Bus Usage
     TradeEvent trade = (TradeEvent) event.payload();
     System.out.println("Trade: " + trade.tradeId() + 
                       " @ " + trade.price() + 
@@ -269,7 +324,7 @@ JMH benchmarks measure:
 ## Future Enhancements
 
 - [ ] Market order support (currently limit orders only)
-- [ ] Stop and stop-limit order types
+- [ ] Stop and stop-limit order types (with TickEvent integration)
 - [ ] Iceberg order handling
 - [ ] Self-trade prevention
 - [x] Order book snapshots for faster replay (implemented)
@@ -279,9 +334,20 @@ JMH benchmarks measure:
 - [ ] Off-heap order book storage
 - [ ] Lock-free matching algorithm
 - [ ] Multi-threaded matching (parallel symbols)
+- [ ] CPU affinity for matching threads
+
+## Documentation
+
+- [Matching Engine Core Implementation](MATCHING_ENGINE_CORE_IMPLEMENTATION.md) - Detailed implementation guide
+- [Performance Benchmarks](PERFORMANCE_BENCHMARKS.md) - Benchmark results and methodology
+- [Cache Warming Service](CACHE_WARMING_SERVICE.md) - Cache optimization
+- [Cache Reconciliation](CACHE_RECONCILIATION.md) - State reconciliation
+- [Acceptance Criteria Verification](ACCEPTANCE_CRITERIA_VERIFICATION.md) - Requirements validation
 
 ## See Also
 
 - [Event Bus Documentation](../eventbus/README.md)
 - [Order Book Documentation](../orderbook/README.md)
+- [Risk Module Documentation](../risk/README.md)
 - [Architecture Overview](../../docs/ARCHITECTURE.md)
+
