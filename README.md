@@ -197,6 +197,8 @@ Performance regression comparison.
 ## Documentation
 
 - [Event Bus README](docs/EVENT_BUS_README.md)
+- [Event Bus Integration Guide](docs/EVENTBUS_INTEGRATION.md) - Comprehensive guide for gateway integration
+- [Event Bus Integration Status](docs/EVENTBUS_INTEGRATION_STATUS.md) - Acceptance criteria validation
 - [Performance Tuning Guide](docs/PERFORMANCE_TUNING.md) - Comprehensive tuning for ultra-low latency
 - [Benchmark Guide](docs/BENCHMARK_GUIDE.md) - Running and interpreting performance benchmarks
 - [Architecture Decision Records](docs/adr/)
