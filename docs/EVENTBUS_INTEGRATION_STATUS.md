@@ -22,14 +22,13 @@ This document validates that all acceptance criteria for the "Integrate Gateways
 
 **FIX Gateway** (`FixGateway.java`):
 ```java
-// Subscribes to outbound events
-eventBus.subscribe(EventType.ORDER_ACCEPTED, this::sendExecutionReport);
-eventBus.subscribe(EventType.ORDER_FILLED, this::sendExecutionReport);
-
-// Publishes inbound orders
+// Publishes inbound FIX messages to EventBus
 Event event = Event.create(timestamp, sequence, SourceId.FEED_HANDLER,
-    EventType.ORDER_SUBMITTED, correlationId, order);
+    EventType.ORDER_FILLED, correlationId, "Message from FIX");
 eventBus.publish(event);
+
+// Note: Currently FIX Gateway doesn't subscribe to EventBus events.
+// Outbound FIX messages are sent via direct sendMessage() calls.
 ```
 
 **WebSocket Gateway** (`WebSocketGateway.java`):
@@ -40,15 +39,25 @@ eventBus.subscribe(EventType.ORDER_FILLED, this::broadcastOrderEvent);
 eventBus.subscribe(EventType.MARKET_DATA_UPDATE, this::broadcastMarketDataEvent);
 ```
 
-**REST Gateway** (`RestGateway.java`):
+**REST Gateway** (`RestGateway.java` + `OrderService.java`):
 ```java
-// Uses EventBus as Spring Bean
+// Creates EventBus as Spring Bean
 @Bean
 public EventBus eventBus() {
     AeronEventBus eventBus = new AeronEventBus();
     eventBus.start();
     return eventBus;
 }
+
+// OrderService publishes orders via EventBus
+OrderEvent orderEvent = OrderEvent.newOrder(orderId, symbol, side, type, qty, price, account, 1);
+Event event = Event.now(orderId, SourceId.REST_GATEWAY, EventType.ORDER_SUBMITTED, 0L, orderEvent);
+eventBus.publish(event);
+
+// OrderService also subscribes to order status updates
+eventBus.subscribe(EventType.ORDER_ACCEPTED, this::handleOrderAccepted);
+eventBus.subscribe(EventType.ORDER_FILLED, this::handleOrderFilled);
+eventBus.subscribe(EventType.ORDER_CANCELLED, this::handleOrderCancelled);
 ```
 
 ---
@@ -186,16 +195,16 @@ Zero message loss verified ✓
 ### ✅ EventBus publishers and subscribers for each gateway
 
 **FIX Gateway**:
-- ✅ Publishes: ORDER_SUBMITTED
-- ✅ Subscribes: ORDER_ACCEPTED, ORDER_FILLED, ORDER_REJECTED
+- ✅ Publishes: FIX messages received (mapped to ORDER_FILLED events)
+- ⚠️  Subscribes: Not currently implemented (outbound via direct calls)
 
 **WebSocket Gateway**:
 - ✅ Publishes: None (broadcast only)
 - ✅ Subscribes: ORDER_ACCEPTED, ORDER_FILLED, ORDER_PARTIALLY_FILLED, ORDER_CANCELLED, MARKET_DATA_UPDATE
 
 **REST Gateway**:
-- ✅ Publishes: ORDER_SUBMITTED (via Spring controller)
-- ✅ Subscribes: As needed (via Spring bean injection)
+- ✅ Publishes: ORDER_SUBMITTED (via OrderService)
+- ✅ Subscribes: ORDER_ACCEPTED, ORDER_FILLED, ORDER_PARTIALLY_FILLED, ORDER_CANCELLED, ORDER_REJECTED
 
 ---
 
@@ -245,27 +254,31 @@ public static final int MARKET_DATA_UPDATE = 1000; // market-data.in
 
 ---
 
-### ✅ Support replay markers for resilience testing
-
-**Implementation**:
-- ✅ Monotonically increasing sequence numbers
-- ✅ `EventBus.replay()` method
-- ✅ `EventBus.getCurrentSequence()` for checkpointing
-
-**API**:
-```java
-// Get current sequence for checkpoint
-long checkpoint = eventBus.getCurrentSequence();
-
-// Replay events from sequence 1000 to 2000
-long replayedCount = eventBus.replay(1000, 2000, event -> {
-    handleEvent(event);
-});
-```
+### ⚠️ Support replay markers for resilience testing
 
 **Documentation**: See `docs/EVENTBUS_INTEGRATION.md` - "Replay Support" section
 
-**Status**: Default implementation throws `UnsupportedOperationException`. To enable full replay support, implement persistent event log (Chronicle Queue or Kafka).
+**Status**: **INFRASTRUCTURE COMPLETE, IMPLEMENTATION PENDING**
+
+**Current State**: 
+- Event sequence numbers are tracked and assigned to all events
+- EventBus interface defines replay() API
+- getCurrentSequence() available for checkpointing
+
+**Implementation Note**:
+The default AeronEventBus implementation does not persist events, so replay() throws `UnsupportedOperationException`. To enable full replay support, integrate with a persistent event store like Chronicle Queue or Kafka.
+
+**API**:
+```java
+// Sequence tracking (working)
+long checkpoint = eventBus.getCurrentSequence();
+
+// Replay (requires persistent store)
+long replayedCount = eventBus.replay(1000, 2000, event -> {
+    handleEvent(event);
+});
+// Throws UnsupportedOperationException in default implementation
+```
 
 ---
 
