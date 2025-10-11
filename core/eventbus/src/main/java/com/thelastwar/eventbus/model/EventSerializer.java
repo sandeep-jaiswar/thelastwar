@@ -52,6 +52,7 @@ public final class EventSerializer {
         buffer.put(event.status());
         buffer.putLong(event.account());
         buffer.putInt(event.exchange());
+        buffer.put(event.timeInForce());
     }
     
     /**
@@ -72,9 +73,10 @@ public final class EventSerializer {
         byte status = buffer.get();
         long account = buffer.getLong();
         int exchange = buffer.getInt();
+        byte timeInForce = buffer.get();
         
         return new OrderEvent(orderId, symbol, side, orderType, quantity, price,
-                timestamp, status, account, exchange);
+                timestamp, status, account, exchange, timeInForce);
     }
     
     /**

@@ -20,6 +20,7 @@ package com.thelastwar.eventbus.model;
  * @param status        Order status: 0=New, 1=PartiallyFilled, 2=Filled, 3=Cancelled, 4=Rejected
  * @param account       Trading account identifier
  * @param exchange      Exchange identifier
+ * @param timeInForce   Time in force: 0=GTC, 1=IOC, 2=FOK, 3=DAY
  */
 public record OrderEvent(
         long orderId,
@@ -31,7 +32,8 @@ public record OrderEvent(
         long timestamp,
         byte status,
         long account,
-        int exchange) {
+        int exchange,
+        byte timeInForce) {
     
     // Order Side constants
     public static final byte SIDE_BUY = 1;
@@ -49,6 +51,12 @@ public record OrderEvent(
     public static final byte STATUS_FILLED = 2;
     public static final byte STATUS_CANCELLED = 3;
     public static final byte STATUS_REJECTED = 4;
+    
+    // Time In Force constants
+    public static final byte TIF_GTC = 0; // Good Till Cancel
+    public static final byte TIF_IOC = 1; // Immediate Or Cancel
+    public static final byte TIF_FOK = 2; // Fill Or Kill
+    public static final byte TIF_DAY = 3; // Day order
     
     /**
      * Compact constructor with validation.
@@ -90,7 +98,27 @@ public record OrderEvent(
     public static OrderEvent newOrder(long orderId, String symbol, byte side, byte orderType,
                                       long quantity, long price, long account, int exchange) {
         return new OrderEvent(orderId, symbol, side, orderType, quantity, price,
-                System.nanoTime(), STATUS_NEW, account, exchange);
+                System.nanoTime(), STATUS_NEW, account, exchange, TIF_GTC);
+    }
+    
+    /**
+     * Factory method for creating a new order event with specified time-in-force.
+     * 
+     * @param orderId     Order identifier
+     * @param symbol      Trading symbol
+     * @param side        Buy or Sell
+     * @param orderType   Market, Limit, etc.
+     * @param quantity    Order quantity
+     * @param price       Order price (0 for market orders)
+     * @param account     Account identifier
+     * @param exchange    Exchange identifier
+     * @param timeInForce Time in force (GTC, IOC, FOK, DAY)
+     * @return new OrderEvent with current timestamp and NEW status
+     */
+    public static OrderEvent newOrder(long orderId, String symbol, byte side, byte orderType,
+                                      long quantity, long price, long account, int exchange, byte timeInForce) {
+        return new OrderEvent(orderId, symbol, side, orderType, quantity, price,
+                System.nanoTime(), STATUS_NEW, account, exchange, timeInForce);
     }
     
     /**
@@ -101,7 +129,7 @@ public record OrderEvent(
      */
     public OrderEvent withStatus(byte newStatus) {
         return new OrderEvent(orderId, symbol, side, orderType, quantity, price,
-                System.nanoTime(), newStatus, account, exchange);
+                System.nanoTime(), newStatus, account, exchange, timeInForce);
     }
     
     /**
@@ -112,7 +140,7 @@ public record OrderEvent(
      */
     public OrderEvent withQuantity(long newQuantity) {
         return new OrderEvent(orderId, symbol, side, orderType, newQuantity, price,
-                System.nanoTime(), status, account, exchange);
+                System.nanoTime(), status, account, exchange, timeInForce);
     }
     
     /**
@@ -140,5 +168,32 @@ public record OrderEvent(
      */
     public boolean isTerminal() {
         return status == STATUS_FILLED || status == STATUS_CANCELLED || status == STATUS_REJECTED;
+    }
+    
+    /**
+     * Checks if this is an IOC (Immediate-Or-Cancel) order.
+     * 
+     * @return true if IOC order
+     */
+    public boolean isIOC() {
+        return timeInForce == TIF_IOC;
+    }
+    
+    /**
+     * Checks if this is a FOK (Fill-Or-Kill) order.
+     * 
+     * @return true if FOK order
+     */
+    public boolean isFOK() {
+        return timeInForce == TIF_FOK;
+    }
+    
+    /**
+     * Checks if this is a MARKET order.
+     * 
+     * @return true if market order
+     */
+    public boolean isMarketOrder() {
+        return orderType == TYPE_MARKET;
     }
 }

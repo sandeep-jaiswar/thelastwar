@@ -194,14 +194,39 @@ public class MatchingEngine implements IMatchingEngine {
             orderEvent.side(),
             orderEvent.price(),
             orderEvent.quantity(),
-            timestamp
+            timestamp,
+            orderEvent.orderType(),
+            orderEvent.timeInForce()
         );
+        
+        // Check if FOK order can be fully filled before attempting match
+        if (orderEvent.isFOK()) {
+            long availableLiquidity = calculateAvailableLiquidity(book, order);
+            if (availableLiquidity < order.quantity()) {
+                // FOK order cannot be fully filled - reject entire order
+                cancelOrder(orderEvent, "FOK order cannot be fully filled");
+                return;
+            }
+        }
         
         // Attempt to match the order
         long remainingQuantity = matchOrder(book, order, orderEvent);
         
-        // If order has remaining quantity, add to book
-        if (remainingQuantity > 0) {
+        // Handle IOC orders - cancel any unfilled portion
+        if (orderEvent.isIOC() && remainingQuantity > 0) {
+            cancelOrder(orderEvent, "IOC order - cancel unfilled portion");
+            return;
+        }
+        
+        // Handle FOK orders - should be fully filled at this point
+        if (orderEvent.isFOK() && remainingQuantity > 0) {
+            // This shouldn't happen if liquidity check was correct
+            cancelOrder(orderEvent, "FOK order partially filled - cancelling");
+            return;
+        }
+        
+        // If order has remaining quantity, add to book (GTC or DAY orders only)
+        if (remainingQuantity > 0 && !orderEvent.isMarketOrder()) {
             Order residualOrder = order.withQuantity(remainingQuantity);
             book.addOrder(residualOrder);
             
@@ -210,8 +235,9 @@ public class MatchingEngine implements IMatchingEngine {
                 // Partial fill
                 publishPartialFillExecution(orderEvent, orderEvent.quantity() - remainingQuantity, remainingQuantity);
             }
-        } else {
-            // Fully filled - execution already published in matchOrder
+        } else if (remainingQuantity > 0 && orderEvent.isMarketOrder()) {
+            // Market order with unfilled quantity - publish as partially filled with cancel
+            cancelOrder(orderEvent, "Market order exhausted liquidity");
         }
     }
     
@@ -237,9 +263,9 @@ public class MatchingEngine implements IMatchingEngine {
             }
             
             // Check if prices cross (can match)
-            boolean canMatch = order.isBuy() ? 
-                (order.price() >= bestPrice) : 
-                (order.price() <= bestPrice);
+            // For MARKET orders, always match at any price
+            boolean canMatch = order.isMarketOrder() || 
+                (order.isBuy() ? (order.price() >= bestPrice) : (order.price() <= bestPrice));
             
             if (!canMatch) {
                 // No matching price
@@ -274,6 +300,91 @@ public class MatchingEngine implements IMatchingEngine {
         }
         
         return remainingQty;
+    }
+    
+    /**
+     * Calculates available liquidity for an order to determine if FOK can be filled.
+     * 
+     * @param book Order book
+     * @param order Order to check liquidity for
+     * @return Total quantity available at acceptable price levels
+     */
+    private long calculateAvailableLiquidity(LimitOrderBook book, Order order) {
+        long availableLiquidity = 0;
+        boolean isBuy = order.isBuy();
+        
+        // For market orders, sum all liquidity on opposite side
+        if (order.isMarketOrder()) {
+            var levels = isBuy ? book.getAskLevels(Integer.MAX_VALUE) : book.getBidLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                availableLiquidity += level.getTotalQuantity();
+            }
+            return availableLiquidity;
+        }
+        
+        // For limit orders, sum liquidity at prices that would match
+        if (isBuy) {
+            // Buy order: sum ask levels at or below order price
+            var levels = book.getAskLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                if (level.getPrice() <= order.price()) {
+                    availableLiquidity += level.getTotalQuantity();
+                } else {
+                    break; // Levels are sorted, no need to check further
+                }
+            }
+        } else {
+            // Sell order: sum bid levels at or above order price
+            var levels = book.getBidLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                if (level.getPrice() >= order.price()) {
+                    availableLiquidity += level.getTotalQuantity();
+                } else {
+                    break; // Levels are sorted, no need to check further
+                }
+            }
+        }
+        
+        return availableLiquidity;
+    }
+    
+    /**
+     * Cancels an order and publishes cancellation event.
+     * 
+     * @param orderEvent Order to cancel
+     * @param reason Cancellation reason
+     */
+    private void cancelOrder(OrderEvent orderEvent, String reason) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create cancellation execution event
+        ExecutionEvent execution = new ExecutionEvent(
+            executionId,
+            orderEvent.orderId(),
+            orderEvent.symbol(),
+            orderEvent.side(),
+            ExecutionEvent.EXEC_TYPE_CANCELLED,
+            ExecutionEvent.STATUS_CANCELLED,
+            0L, // Last fill qty
+            0L, // Last fill price
+            0L, // Cumulative filled
+            orderEvent.quantity(), // Leaves qty
+            timestamp,
+            orderEvent.account(),
+            orderEvent.exchange(),
+            0   // no rejection
+        );
+        
+        Event executionEventWrapper = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_CANCELLED,
+            0L,
+            execution
+        );
+        eventBus.publish(executionEventWrapper);
     }
     
     /**
@@ -602,7 +713,9 @@ public class MatchingEngine implements IMatchingEngine {
             existingOrder.side(),
             newPrice,
             newQuantity,
-            System.nanoTime() // New timestamp - loses time priority
+            System.nanoTime(), // New timestamp - loses time priority
+            existingOrder.orderType(),
+            existingOrder.timeInForce()
         );
         
         // Create corresponding OrderEvent for matching
@@ -610,13 +723,14 @@ public class MatchingEngine implements IMatchingEngine {
             modifiedOrder.orderId(),
             modifiedOrder.symbol(),
             modifiedOrder.side(),
-            OrderEvent.TYPE_LIMIT,
+            modifiedOrder.orderType(),
             modifiedOrder.quantity(),
             modifiedOrder.price(),
             modifiedOrder.timestamp(),
             OrderEvent.STATUS_NEW,
             modify.account(),
-            0 // exchange
+            0, // exchange
+            modifiedOrder.timeInForce()
         );
         
         // Try to match the modified order

@@ -117,7 +117,7 @@ public class LimitOrderBook {
         if (newPrice > 0 && newPrice != oldOrder.price()) {
             removeOrder(orderId);
             Order newOrder = new Order(orderId, oldOrder.symbol(), oldOrder.side(),
-                    newPrice, newQuantity, System.nanoTime());
+                    newPrice, newQuantity, System.nanoTime(), oldOrder.orderType(), oldOrder.timeInForce());
             addOrder(newOrder);
             return true;
         }
