@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * - Dropped messages (count of messages that could not be published)
  * - Active subscribers (gauge)
  * - Queue depth (ring buffer utilization)
+ * - Consumer lag (difference between published and consumed events)
  * 
  * All metrics are exported via Micrometer and can be scraped by Prometheus.
  */
@@ -35,6 +36,7 @@ public class EventBusMetrics {
     // Gauges
     private final AtomicLong activeSubscribers = new AtomicLong(0);
     private final AtomicLong queueDepth = new AtomicLong(0);
+    private final AtomicLong consumerLag = new AtomicLong(0);
     
     /**
      * Creates a new EventBusMetrics instance.
@@ -83,6 +85,11 @@ public class EventBusMetrics {
         
         Gauge.builder("eventbus.queue.depth", queueDepth, AtomicLong::get)
                 .description("Current queue depth (ring buffer utilization)")
+                .tag("bus", busName)
+                .register(registry);
+        
+        Gauge.builder("eventbus.consumer.lag", consumerLag, AtomicLong::get)
+                .description("Consumer lag (difference between published and consumed events)")
                 .tag("bus", busName)
                 .register(registry);
     }
@@ -198,5 +205,24 @@ public class EventBusMetrics {
      */
     public long getQueueDepth() {
         return queueDepth.get();
+    }
+    
+    /**
+     * Updates the consumer lag.
+     * Consumer lag is the difference between published and consumed events.
+     * 
+     * @param lag the current consumer lag
+     */
+    public void setConsumerLag(long lag) {
+        consumerLag.set(lag);
+    }
+    
+    /**
+     * Gets the current consumer lag.
+     * 
+     * @return consumer lag (number of events behind)
+     */
+    public long getConsumerLag() {
+        return consumerLag.get();
     }
 }
