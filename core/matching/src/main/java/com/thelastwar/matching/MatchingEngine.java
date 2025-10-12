@@ -39,6 +39,7 @@ public class MatchingEngine implements IMatchingEngine {
     private final AtomicLong sequenceTracker;
     private volatile boolean running;
     private final RiskValidator riskValidator;
+    private final ExecutionPublisher executionPublisher; // Optional external publisher
     
     /**
      * Creates a new matching engine with default risk validation.
@@ -56,6 +57,17 @@ public class MatchingEngine implements IMatchingEngine {
      * @param riskValidator Risk validator for pre-trade checks
      */
     public MatchingEngine(EventBus eventBus, RiskValidator riskValidator) {
+        this(eventBus, riskValidator, null);
+    }
+    
+    /**
+     * Creates a new matching engine with custom risk validation and optional execution publisher.
+     * 
+     * @param eventBus            Event bus for publishing/subscribing events
+     * @param riskValidator       Risk validator for pre-trade checks
+     * @param executionPublisher  Optional external publisher for downstream systems (can be null)
+     */
+    public MatchingEngine(EventBus eventBus, RiskValidator riskValidator, ExecutionPublisher executionPublisher) {
         this.eventBus = eventBus;
         this.books = new ConcurrentHashMap<>();
         this.executionIdCounter = new AtomicLong(0);
@@ -63,6 +75,7 @@ public class MatchingEngine implements IMatchingEngine {
         this.sequenceTracker = new AtomicLong(0);
         this.running = false;
         this.riskValidator = riskValidator;
+        this.executionPublisher = executionPublisher;
     }
     
     /**
@@ -86,6 +99,11 @@ public class MatchingEngine implements IMatchingEngine {
             throw new IllegalStateException("Matching engine is already running");
         }
         
+        // Start execution publisher if provided
+        if (executionPublisher != null && !executionPublisher.isRunning()) {
+            executionPublisher.start();
+        }
+        
         // Subscribe to order submission events
         eventBus.subscribe(EventType.ORDER_SUBMITTED, this::handleOrderEvent);
         
@@ -97,6 +115,11 @@ public class MatchingEngine implements IMatchingEngine {
      */
     public void stop() {
         running = false;
+        
+        // Stop execution publisher if provided
+        if (executionPublisher != null && executionPublisher.isRunning()) {
+            executionPublisher.stop();
+        }
     }
     
     /**
@@ -176,6 +199,11 @@ public class MatchingEngine implements IMatchingEngine {
             rejection
         );
         eventBus.publish(rejectionEvent);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(rejection, 3);
+        }
     }
     
     /**
@@ -385,6 +413,11 @@ public class MatchingEngine implements IMatchingEngine {
             execution
         );
         eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
@@ -453,6 +486,11 @@ public class MatchingEngine implements IMatchingEngine {
         );
         eventBus.publish(tradeEventWrapper);
         
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishTradeWithRetry(trade, 3);
+        }
+        
         // Create execution event for incoming order
         long cumulativeFilled = incomingOrder.quantity() - (incomingOrder.quantity() - fillQty);
         long leavesQty = incomingOrder.quantity() - cumulativeFilled;
@@ -476,6 +514,11 @@ public class MatchingEngine implements IMatchingEngine {
             execution
         );
         eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
@@ -507,6 +550,11 @@ public class MatchingEngine implements IMatchingEngine {
             execution
         );
         eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
