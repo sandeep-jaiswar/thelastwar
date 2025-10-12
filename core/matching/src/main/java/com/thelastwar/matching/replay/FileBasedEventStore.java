@@ -109,15 +109,29 @@ public class FileBasedEventStore implements ReplayEventStore {
     public long replay(long fromSequence, long toSequence, Consumer<Event> consumer) throws IOException {
         long replayedCount = 0;
         
+        if (!Files.exists(storePath) || Files.size(storePath) == 0) {
+            return 0;
+        }
+        
         try (FileChannel channel = FileChannel.open(storePath, StandardOpenOption.READ)) {
             ByteBuffer buffer = ByteBuffer.allocate(8192);
             
-            while (channel.position() < channel.size()) {
+            while (true) {
+                // Check if we're at end of file
+                if (channel.position() >= channel.size()) {
+                    break;
+                }
+                
                 // Read event header
                 buffer.clear();
                 buffer.limit(36);
                 
-                int bytesRead = channel.read(buffer);
+                int bytesRead = 0;
+                while (buffer.hasRemaining() && bytesRead >= 0) {
+                    int read = channel.read(buffer);
+                    if (read < 0) break;
+                    bytesRead += read;
+                }
                 if (bytesRead < 36) break;
                 
                 buffer.flip();
@@ -130,15 +144,27 @@ public class FileBasedEventStore implements ReplayEventStore {
                 // Read payload length
                 buffer.clear();
                 buffer.limit(4);
-                if (channel.read(buffer) < 4) break;
+                bytesRead = 0;
+                while (buffer.hasRemaining() && bytesRead >= 0) {
+                    int read = channel.read(buffer);
+                    if (read < 0) break;
+                    bytesRead += read;
+                }
+                if (bytesRead < 4) break;
+                
                 buffer.flip();
                 int payloadLen = buffer.getInt();
                 
                 // Read payload
                 byte[] payloadBytes = new byte[payloadLen];
                 ByteBuffer payloadBuffer = ByteBuffer.wrap(payloadBytes);
-                int payloadRead = channel.read(payloadBuffer);
-                if (payloadRead < payloadLen) break;
+                bytesRead = 0;
+                while (payloadBuffer.hasRemaining() && bytesRead >= 0) {
+                    int read = channel.read(payloadBuffer);
+                    if (read < 0) break;
+                    bytesRead += read;
+                }
+                if (bytesRead < payloadLen) break;
                 
                 // Process event if in range
                 if (sequence >= fromSequence && sequence <= toSequence) {
@@ -224,11 +250,17 @@ public class FileBasedEventStore implements ReplayEventStore {
     }
     
     private byte[] serializeOrderEvent(com.thelastwar.eventbus.model.OrderEvent order) {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
         try {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(bos);
+            
             dos.writeLong(order.orderId());
-            dos.writeUTF(order.symbol());
+            
+            // Write symbol length and bytes manually
+            byte[] symbolBytes = order.symbol().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            dos.writeInt(symbolBytes.length);
+            dos.write(symbolBytes);
+            
             dos.writeByte(order.side());
             dos.writeByte(order.orderType());
             dos.writeLong(order.quantity());
@@ -250,13 +282,8 @@ public class FileBasedEventStore implements ReplayEventStore {
             return null;
         }
         
-        // Try to deserialize as OrderEvent first
-        try {
-            return deserializeOrderEvent(bytes);
-        } catch (Exception e) {
-            // Fall back to string deserialization
-            return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-        }
+        // Deserialize as OrderEvent
+        return deserializeOrderEvent(bytes);
     }
     
     private com.thelastwar.eventbus.model.OrderEvent deserializeOrderEvent(byte[] bytes) throws IOException {
@@ -264,7 +291,13 @@ public class FileBasedEventStore implements ReplayEventStore {
         DataInputStream dis = new DataInputStream(bis);
         
         long orderId = dis.readLong();
-        String symbol = dis.readUTF();
+        
+        // Read symbol length and bytes manually
+        int symbolLen = dis.readInt();
+        byte[] symbolBytes = new byte[symbolLen];
+        dis.readFully(symbolBytes);
+        String symbol = new String(symbolBytes, java.nio.charset.StandardCharsets.UTF_8);
+        
         byte side = dis.readByte();
         byte orderType = dis.readByte();
         long quantity = dis.readLong();

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,11 @@ class ReplayValidationTest {
         eventBus.start();
         engine = new MatchingEngine(eventBus);
         engine.start();
-        eventStore = new FileBasedEventStore(tempDir.resolve("test-events.dat"));
+        
+        // Create fresh event store for each test
+        Path storePath = tempDir.resolve("test-events.dat");
+        Files.deleteIfExists(storePath);
+        eventStore = new FileBasedEventStore(storePath);
     }
     
     @AfterEach
@@ -70,12 +75,18 @@ class ReplayValidationTest {
             eventStore.append(event);
         }
         
+        System.out.println("Stored " + eventStore.getEventCount() + " events");
+        System.out.println("Current sequence: " + eventStore.getCurrentSequence());
+        
         assertEquals(100, eventStore.getEventCount());
         assertEquals(100, eventStore.getCurrentSequence());
         
         // Replay events
         List<Event> replayed = new ArrayList<>();
         long replayedCount = eventStore.replay(1, 100, replayed::add);
+        
+        System.out.println("Replayed " + replayedCount + " events");
+        System.out.println("Replayed list size: " + replayed.size());
         
         assertEquals(100, replayedCount);
         assertEquals(100, replayed.size());
