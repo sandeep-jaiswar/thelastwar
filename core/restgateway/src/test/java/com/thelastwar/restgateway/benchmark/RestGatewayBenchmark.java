@@ -40,7 +40,7 @@ public class RestGatewayBenchmark {
             eventBus = new TestEventBus();
             eventBus.start();
             orderService = new OrderService(eventBus);
-            request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+            request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         }
         
         @TearDown(Level.Trial)

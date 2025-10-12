@@ -8,6 +8,7 @@ import com.dslplatform.json.CompiledJson;
  */
 @CompiledJson
 public record OrderRequest(
+    String clientOrderId, // Client-assigned unique order ID for idempotency
     String symbol,
     String side,      // "BUY" or "SELL"
     String orderType, // "MARKET", "LIMIT", "STOP", "STOP_LIMIT"
@@ -21,6 +22,15 @@ public record OrderRequest(
      * @throws IllegalArgumentException if validation fails
      */
     public void validate() {
+        if (clientOrderId == null || clientOrderId.isEmpty()) {
+            throw new IllegalArgumentException("Client order ID is required");
+        }
+        if (clientOrderId.length() > 64) {
+            throw new IllegalArgumentException("Client order ID exceeds maximum length of 64 characters");
+        }
+        if (!clientOrderId.matches("^[a-zA-Z0-9_-]+$")) {
+            throw new IllegalArgumentException("Client order ID must contain only alphanumeric characters, hyphens, or underscores");
+        }
         if (symbol == null || symbol.isEmpty()) {
             throw new IllegalArgumentException("Symbol is required");
         }
