@@ -1,7 +1,10 @@
 name: Deterministic Replay Validation
 on:
   pull_request:
-    branches: [ production ]
+    branches: [ production, main ]
+  push:
+    branches: [ production, main ]
+  workflow_dispatch:
 
 jobs:
   replay:
@@ -13,18 +16,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
-      - name: Check if replay tests exist
-        id: check_replay
-        run: |
-          if ./gradlew tasks --all | grep -q "replayTest"; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Run Replay Consistency Tests
-        if: steps.check_replay.outputs.exists == 'true'
-        run: ./gradlew replayTest --no-daemon
-      - name: Skip replay tests (not implemented yet)
-        if: steps.check_replay.outputs.exists == 'false'
-        run: echo "Replay tests not yet implemented - skipping"
+      - name: Run Replay and Recovery Tests
+        run: ./gradlew :core:matching:test --tests "*Replay*" --no-daemon
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-test-reports
+          path: core/matching/build/reports/tests/
+          retention-days: 7
 

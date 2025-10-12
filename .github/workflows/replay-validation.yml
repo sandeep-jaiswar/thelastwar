@@ -1,0 +1,170 @@
+name: Nightly Replay Validation
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger
+  pull_request:
+    branches: [ production, main ]
+    paths:
+      - 'core/matching/**'
+      - 'core/eventbus/**'
+      - '.github/workflows/replay-validation.yml'
+
+jobs:
+  replay-validation:
+    name: Deterministic Replay Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'gradle'
+      
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
+      - name: Run Replay Validation Tests
+        run: |
+          ./gradlew :core:matching:test --tests "*Replay*" --no-daemon --info
+        continue-on-error: true
+      
+      - name: Generate Replay Report
+        if: always()
+        run: |
+          echo "# Replay Validation Report" > replay-report.md
+          echo "" >> replay-report.md
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> replay-report.md
+          echo "**Commit:** ${{ github.sha }}" >> replay-report.md
+          echo "" >> replay-report.md
+          
+          if [ -f core/matching/build/reports/tests/test/index.html ]; then
+            echo "## Test Results" >> replay-report.md
+            echo "" >> replay-report.md
+            echo "Test report available at: core/matching/build/reports/tests/test/index.html" >> replay-report.md
+          fi
+          
+          if [ -f core/matching/build/test-results/test/*.xml ]; then
+            TESTS=$(grep -c 'testcase' core/matching/build/test-results/test/*.xml || echo "0")
+            FAILURES=$(grep -c 'failure' core/matching/build/test-results/test/*.xml || echo "0")
+            PASSED=$((TESTS - FAILURES))
+            
+            echo "" >> replay-report.md
+            echo "**Tests Run:** $TESTS" >> replay-report.md
+            echo "**Tests Passed:** $PASSED" >> replay-report.md
+            echo "**Tests Failed:** $FAILURES" >> replay-report.md
+            
+            if [ "$FAILURES" -eq "0" ]; then
+              echo "" >> replay-report.md
+              echo "✅ **All replay validation tests passed!**" >> replay-report.md
+            else
+              echo "" >> replay-report.md
+              echo "❌ **Some replay validation tests failed**" >> replay-report.md
+            fi
+          fi
+          
+          cat replay-report.md
+      
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-validation-reports-${{ github.run_number }}
+          path: |
+            core/matching/build/reports/tests/
+            core/matching/build/test-results/
+            replay-report.md
+          retention-days: 30
+      
+      - name: Check Replay Validation Success
+        run: |
+          if [ -f core/matching/build/test-results/test/*.xml ]; then
+            FAILURES=$(grep -c 'failure' core/matching/build/test-results/test/*.xml || echo "0")
+            
+            if [ "$FAILURES" -ne "0" ]; then
+              echo "❌ Replay validation failed with $FAILURES failures"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ Replay validation passed"
+      
+      - name: Comment PR (on pull request)
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'replay-report.md';
+            
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: '## 🔄 Replay Validation Results\n\n' + report
+              });
+            }
+
+  throughput-benchmark:
+    name: Replay Throughput Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'gradle'
+      
+      - name: Run Throughput Benchmark
+        run: |
+          echo "Running replay throughput benchmark..."
+          ./gradlew :core:matching:test --tests "*ReplayValidationTest.testReplayThroughputMeasurement*" --no-daemon
+        continue-on-error: true
+      
+      - name: Extract Throughput Metrics
+        if: always()
+        run: |
+          echo "# Throughput Benchmark Results" > throughput-report.md
+          echo "" >> throughput-report.md
+          echo "**Target:** ≥ 1,000,000 events/sec" >> throughput-report.md
+          echo "" >> throughput-report.md
+          
+          # Extract throughput from test output
+          if [ -f core/matching/build/test-results/test/binary/output.bin ]; then
+            THROUGHPUT=$(strings core/matching/build/test-results/test/binary/output.bin | grep "events/sec" | tail -1 || echo "N/A")
+            echo "**Measured Throughput:** $THROUGHPUT" >> throughput-report.md
+          fi
+          
+          cat throughput-report.md
+      
+      - name: Upload Throughput Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: throughput-benchmark-${{ github.run_number }}
+          path: throughput-report.md
+          retention-days: 30
