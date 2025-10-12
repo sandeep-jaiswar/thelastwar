@@ -141,6 +141,153 @@ System.out.println("Total Executions: " + metrics.totalExecutions());
 System.out.println("Current Sequence: " + metrics.currentSequence());
 ```
 
+### Real-Time Performance Metrics
+
+The matching engine provides comprehensive real-time metrics via Micrometer for monitoring:
+
+```java
+// Create metrics collector with Prometheus registry
+MeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+MatchingEngineMetricsCollector metrics = new MatchingEngineMetricsCollector(registry, "engine-1");
+
+// Create engine with metrics
+MatchingEngine engine = new MatchingEngine(eventBus, riskValidator, null, metrics);
+engine.start();
+
+// Access metrics
+long ordersProcessed = metrics.getOrdersProcessedCount();
+long tradesGenerated = metrics.getTradesGeneratedCount();
+long ordersRejected = metrics.getOrdersRejectedCount();
+long ordersCancelled = metrics.getOrdersCancelledCount();
+long ordersModified = metrics.getOrdersModifiedCount();
+
+// Latency metrics (in nanoseconds)
+double p50 = metrics.getP50MatchLatencyNanos();
+double p95 = metrics.getP95MatchLatencyNanos();
+double p99 = metrics.getP99MatchLatencyNanos();
+
+// Queue depth
+long queueDepth = metrics.getQueueDepth();
+
+// Export to Prometheus
+String prometheusMetrics = ((PrometheusMeterRegistry) metrics.getRegistry()).scrape();
+```
+
+#### Available Metrics
+
+| Metric Name | Type | Description |
+|-------------|------|-------------|
+| `matching.orders.processed` | Counter | Total orders processed by the engine |
+| `matching.trades.generated` | Counter | Total trades generated |
+| `matching.orders.rejected` | Counter | Total orders rejected (risk/validation) |
+| `matching.orders.cancelled` | Counter | Total orders cancelled |
+| `matching.orders.modified` | Counter | Total orders modified |
+| `matching.latency.match` | Timer | Order matching latency (p50, p95, p99) |
+| `matching.latency.cancel` | Timer | Order cancellation latency (p50, p95, p99) |
+| `matching.latency.modify` | Timer | Order modification latency (p50, p95, p99) |
+| `matching.queue.depth` | Gauge | Current queue depth for pending orders |
+
+All metrics are tagged with `engine=<name>` for multi-instance deployments.
+
+#### Performance Targets
+
+- **p99 latency**: < 15 µs
+- **Profiling overhead**: < 1%
+- **Throughput**: ≥ 5M orders/sec per instance
+
+#### Prometheus Integration
+
+Metrics can be scraped by Prometheus at `/metrics` endpoint when integrated with REST gateway:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'matching-engine'
+    static_configs:
+      - targets: ['localhost:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+```
+
+#### Grafana Dashboard
+
+Example Grafana queries:
+
+```promql
+# Orders per second
+rate(matching_orders_processed_total[1m])
+
+# p99 match latency
+matching_latency_match{quantile="0.99"}
+
+# Trade rate
+rate(matching_trades_generated_total[1m])
+
+# Rejection rate
+rate(matching_orders_rejected_total[1m]) / rate(matching_orders_processed_total[1m])
+
+# Queue depth
+matching_queue_depth
+```
+
+#### Alerts
+
+Configure alerts for SLA violations:
+
+```yaml
+# Alert if p99 latency exceeds 15 µs
+- alert: HighMatchingLatency
+  expr: matching_latency_match{quantile="0.99"} > 15000
+  for: 1m
+  labels:
+    severity: critical
+  annotations:
+    summary: "Matching engine p99 latency exceeds 15 µs"
+    description: "Engine {{ $labels.engine }} latency is {{ $value }}ns"
+
+# Alert on high rejection rate  
+- alert: HighRejectionRate
+  expr: rate(matching_orders_rejected_total[5m]) / rate(matching_orders_processed_total[5m]) > 0.1
+  for: 2m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Matching engine rejection rate > 10%"
+```
+
+### Optional Profiling Hooks
+
+For microsecond-level profiling with < 1% overhead:
+
+```java
+// Enable profiling (disabled by default)
+ProfilingHooks profiling = new ProfilingHooks(true);
+
+// Instrument critical sections
+long eventId = profiling.onOrderProcessingStart(orderId, symbol);
+try {
+    // Process order
+    processOrder(order);
+} finally {
+    profiling.onOrderProcessingEnd(eventId, orderId);
+}
+
+// Record specific events
+profiling.onTradeGenerated(tradeId, orderId, fillQty, fillPrice);
+profiling.onOrderRejected(orderId, reasonCode);
+profiling.onOrderCancelled(orderId, symbol);
+
+// Flush periodically
+profiling.flush();
+```
+
+The `ProfilingHooks` class provides stub implementations ready for integration with:
+- Chronicle Flight Recorder (CFR)
+- Java Flight Recorder (JFR)
+- Custom profiling tools
+
+When disabled (default), all operations are no-ops with zero overhead.
+
 ## Matching Logic
 
 ### Algorithm
@@ -309,6 +456,9 @@ JMH benchmarks measure:
 
 - **core:eventbus** - Event Bus integration
 - **core:orderbook** - Order book data structures
+- **core:risk** - Risk validation modules
+- **io.micrometer:micrometer-core** - Metrics collection framework
+- **io.micrometer:micrometer-registry-prometheus** - Prometheus metrics export
 - **JUnit Jupiter** - Testing framework
 - **JMH** - Benchmarking framework
 
