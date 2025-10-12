@@ -65,9 +65,12 @@ All endpoints return JSON responses with:
 
 **Event Publishing:**
 - Orders are published to EventBus immediately after command log persistence
-- Event type: `ORDER_SUBMITTED` (4000), `ORDER_CANCELLED` (2004)
+- Event type: `ORDER_SUBMITTED` (4000) for submissions
+- Event type: `ORDER_CANCELLED` (2004) for cancellations
 - Source ID: `SourceId.OMS` (4)
 - Payload: OrderEvent with full order details
+
+**Note:** In a production system, ORDER_CANCELLED events would typically be emitted by the Matching Engine after processing the cancel request. This implementation emits them directly from OMS for simplicity.
 
 **Event Structure:**
 ```java
@@ -291,7 +294,7 @@ curl -X GET http://localhost:8080/api/v1/oms/stats
 - Error responses return appropriate messages with success=false
 - Idempotent requests return success with original order ID
 
-### ✅ 2. Orders events emitted within 1–2ms of API ack
+### ✅ 2. Orders events emitted within 1-2ms of API ack
 - Event publishing happens immediately after command log persistence
 - Measured latency included in submission response
 - Test verifies latency < 2ms
