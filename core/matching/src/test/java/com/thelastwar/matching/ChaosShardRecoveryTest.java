@@ -80,7 +80,7 @@ class ChaosShardRecoveryTest {
                 (long) (i + 1), symbol, side, OrderEvent.TYPE_LIMIT,
                 100L, price, (side == OrderEvent.SIDE_BUY) ? 888L : 999L, 1
             );
-            orderIdsBeforeCrash.add((long) i);
+            orderIdsBeforeCrash.add((long) (i + 1));
             eventBus.publish(Event.create(
                 System.nanoTime(), (long) (i + 1), SourceId.OMS,
                 EventType.ORDER_SUBMITTED, 0L, order
