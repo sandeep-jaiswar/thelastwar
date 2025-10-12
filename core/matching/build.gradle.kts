@@ -21,6 +21,12 @@ tasks.test {
     useJUnitPlatform()
     maxHeapSize = "1g"
     
+    // Add JVM args for Aeron to access internal Java modules
+    jvmArgs(
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util.zip=ALL-UNNAMED"
+    )
+    
     testLogging {
         events("passed", "skipped", "failed")
         showStandardStreams = false

@@ -81,7 +81,7 @@ public class ChronicleOrderStateStore implements OrderStateStore {
         }
         
         Order toOrder() {
-            return new Order(orderId, symbol, side, price, quantity, timestamp);
+            return new Order(orderId, symbol, side, price, quantity, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC);
         }
     }
     
@@ -135,7 +135,7 @@ public class ChronicleOrderStateStore implements OrderStateStore {
                 .entries(expectedEntries)
                 .averageKey(5000000000L)
                 .averageValue(new StoredOrder(
-                    new Order(1L, "SYMBOL", Order.SIDE_BUY, 10000L, 100L, System.nanoTime())));
+                    new Order(1L, "SYMBOL", Order.SIDE_BUY, 10000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC)));
         
         // Create or load map
         if (persistenceFile != null) {

@@ -7,12 +7,14 @@ package com.thelastwar.orderbook;
  * Uses primitives to avoid boxing overhead in the hot path.
  * All fields are final for thread-safety and JIT optimization.
  * 
- * @param orderId   Unique order identifier
- * @param symbol    Trading symbol
- * @param side      Order side: 1=Buy, 2=Sell
- * @param price     Order price (in minimum price increments)
- * @param quantity  Remaining quantity (unfilled)
- * @param timestamp Order entry timestamp in nanoseconds
+ * @param orderId     Unique order identifier
+ * @param symbol      Trading symbol
+ * @param side        Order side: 1=Buy, 2=Sell
+ * @param price       Order price (in minimum price increments)
+ * @param quantity    Remaining quantity (unfilled)
+ * @param timestamp   Order entry timestamp in nanoseconds
+ * @param orderType   Order type: 1=Market, 2=Limit, 3=Stop, 4=StopLimit
+ * @param timeInForce Time in force: 0=GTC, 1=IOC, 2=FOK, 3=DAY
  */
 public record Order(
         long orderId,
@@ -20,11 +22,25 @@ public record Order(
         byte side,
         long price,
         long quantity,
-        long timestamp) {
+        long timestamp,
+        byte orderType,
+        byte timeInForce) {
     
     // Order Side constants
     public static final byte SIDE_BUY = 1;
     public static final byte SIDE_SELL = 2;
+    
+    // Order Type constants
+    public static final byte TYPE_MARKET = 1;
+    public static final byte TYPE_LIMIT = 2;
+    public static final byte TYPE_STOP = 3;
+    public static final byte TYPE_STOP_LIMIT = 4;
+    
+    // Time In Force constants
+    public static final byte TIF_GTC = 0; // Good Till Cancel
+    public static final byte TIF_IOC = 1; // Immediate Or Cancel
+    public static final byte TIF_FOK = 2; // Fill Or Kill
+    public static final byte TIF_DAY = 3; // Day order
     
     /**
      * Compact constructor with validation.
@@ -54,7 +70,7 @@ public record Order(
      * @return new Order with updated quantity
      */
     public Order withQuantity(long newQuantity) {
-        return new Order(orderId, symbol, side, price, newQuantity, timestamp);
+        return new Order(orderId, symbol, side, price, newQuantity, timestamp, orderType, timeInForce);
     }
     
     /**
@@ -73,5 +89,32 @@ public record Order(
      */
     public boolean isSell() {
         return side == SIDE_SELL;
+    }
+    
+    /**
+     * Checks if this is an IOC (Immediate-Or-Cancel) order.
+     * 
+     * @return true if IOC order
+     */
+    public boolean isIOC() {
+        return timeInForce == TIF_IOC;
+    }
+    
+    /**
+     * Checks if this is a FOK (Fill-Or-Kill) order.
+     * 
+     * @return true if FOK order
+     */
+    public boolean isFOK() {
+        return timeInForce == TIF_FOK;
+    }
+    
+    /**
+     * Checks if this is a MARKET order.
+     * 
+     * @return true if market order
+     */
+    public boolean isMarketOrder() {
+        return orderType == TYPE_MARKET;
     }
 }

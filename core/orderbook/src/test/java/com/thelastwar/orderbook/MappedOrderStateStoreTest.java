@@ -87,7 +87,7 @@ class MappedOrderStateStoreTest {
     void testPutAndGet() throws IOException {
         store = MappedOrderStateStore.createInMemory(1000);
         
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order);
         
         assertEquals(1, store.size());
@@ -108,10 +108,10 @@ class MappedOrderStateStoreTest {
     void testUpdateOrder() throws IOException {
         store = MappedOrderStateStore.createInMemory(1000);
         
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order1);
         
-        Order order2 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order2 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order2);
         
         assertEquals(1, store.size());
@@ -125,7 +125,7 @@ class MappedOrderStateStoreTest {
     void testRemoveOrder() throws IOException {
         store = MappedOrderStateStore.createInMemory(1000);
         
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order);
         
         Order removed = store.remove(1L);
@@ -152,7 +152,7 @@ class MappedOrderStateStoreTest {
         store = MappedOrderStateStore.createInMemory(1000);
         
         for (long i = 1; i <= 10; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         assertEquals(10, store.size());
@@ -168,7 +168,7 @@ class MappedOrderStateStoreTest {
         // Create store and add orders
         store = MappedOrderStateStore.createPersisted(file, 1000);
         for (long i = 1; i <= 100; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         assertEquals(100, store.size());
         store.close();
@@ -194,7 +194,7 @@ class MappedOrderStateStoreTest {
         
         // Add test data
         for (long i = 1; i <= 100; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         // Create multiple reader threads
@@ -236,7 +236,7 @@ class MappedOrderStateStoreTest {
         
         // Initial data
         for (long i = 1; i <= 100; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         ExecutorService executor = Executors.newFixedThreadPool(11);
@@ -249,7 +249,7 @@ class MappedOrderStateStoreTest {
             try {
                 startLatch.await();
                 for (long i = 101; i <= 1000; i++) {
-                    store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000));
+                    store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
                     Thread.sleep(1); // Slow down to allow readers
                 }
             } catch (InterruptedException e) {
@@ -299,7 +299,7 @@ class MappedOrderStateStoreTest {
     void testCloseStore() throws IOException {
         store = MappedOrderStateStore.createInMemory(1000);
         
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order);
         
         store.close();
@@ -320,7 +320,7 @@ class MappedOrderStateStoreTest {
         store = MappedOrderStateStore.createPersisted(file, 1000);
         
         for (long i = 1; i <= 10; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         // Flush should complete without error
@@ -336,7 +336,7 @@ class MappedOrderStateStoreTest {
         
         // 15-character symbol (max supported)
         String longSymbol = "VERYLONGSYMBOL1";
-        Order order = new Order(1L, longSymbol, Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(1L, longSymbol, Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order);
         
         Order retrieved = store.get(1L);
@@ -349,8 +349,8 @@ class MappedOrderStateStoreTest {
     void testBuySellOrders() throws IOException {
         store = MappedOrderStateStore.createInMemory(1000);
         
-        Order buyOrder = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order sellOrder = new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 100L, 2000L);
+        Order buyOrder = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order sellOrder = new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 100L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         store.put(buyOrder);
         store.put(sellOrder);

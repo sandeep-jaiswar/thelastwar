@@ -37,10 +37,10 @@ public class MappedOrderStateStoreBenchmark {
         
         // Pre-populate with test data
         for (long i = 1; i <= 10000; i++) {
-            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000));
+            store.put(new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, i * 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
-        testOrder = new Order(50000L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        testOrder = new Order(50000L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         orderId = 5000L;
     }
     
@@ -58,7 +58,7 @@ public class MappedOrderStateStoreBenchmark {
     @Benchmark
     public void benchmarkPut(Blackhole blackhole) {
         long id = System.nanoTime() & 0x7FFFFFFFL; // Ensure positive
-        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(order);
         blackhole.consume(order);
     }
@@ -77,7 +77,7 @@ public class MappedOrderStateStoreBenchmark {
     
     @Benchmark
     public void benchmarkUpdate(Blackhole blackhole) {
-        Order updated = new Order(orderId, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime());
+        Order updated = new Order(orderId, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         store.put(updated);
         blackhole.consume(updated);
     }

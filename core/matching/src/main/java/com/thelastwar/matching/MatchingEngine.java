@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * - Each symbol's order book has single-writer guarantee
  * - Event bus handles thread coordination
  */
-public class MatchingEngine {
+public class MatchingEngine implements IMatchingEngine {
     
     private final EventBus eventBus;
     private final ConcurrentHashMap<String, LimitOrderBook> books;
@@ -39,6 +39,7 @@ public class MatchingEngine {
     private final AtomicLong sequenceTracker;
     private volatile boolean running;
     private final RiskValidator riskValidator;
+    private final ExecutionPublisher executionPublisher; // Optional external publisher
     
     /**
      * Creates a new matching engine with default risk validation.
@@ -56,6 +57,17 @@ public class MatchingEngine {
      * @param riskValidator Risk validator for pre-trade checks
      */
     public MatchingEngine(EventBus eventBus, RiskValidator riskValidator) {
+        this(eventBus, riskValidator, null);
+    }
+    
+    /**
+     * Creates a new matching engine with custom risk validation and optional execution publisher.
+     * 
+     * @param eventBus            Event bus for publishing/subscribing events
+     * @param riskValidator       Risk validator for pre-trade checks
+     * @param executionPublisher  Optional external publisher for downstream systems (can be null)
+     */
+    public MatchingEngine(EventBus eventBus, RiskValidator riskValidator, ExecutionPublisher executionPublisher) {
         this.eventBus = eventBus;
         this.books = new ConcurrentHashMap<>();
         this.executionIdCounter = new AtomicLong(0);
@@ -63,6 +75,7 @@ public class MatchingEngine {
         this.sequenceTracker = new AtomicLong(0);
         this.running = false;
         this.riskValidator = riskValidator;
+        this.executionPublisher = executionPublisher;
     }
     
     /**
@@ -86,6 +99,11 @@ public class MatchingEngine {
             throw new IllegalStateException("Matching engine is already running");
         }
         
+        // Start execution publisher if provided
+        if (executionPublisher != null && !executionPublisher.isRunning()) {
+            executionPublisher.start();
+        }
+        
         // Subscribe to order submission events
         eventBus.subscribe(EventType.ORDER_SUBMITTED, this::handleOrderEvent);
         
@@ -97,6 +115,11 @@ public class MatchingEngine {
      */
     public void stop() {
         running = false;
+        
+        // Stop execution publisher if provided
+        if (executionPublisher != null && executionPublisher.isRunning()) {
+            executionPublisher.stop();
+        }
     }
     
     /**
@@ -176,6 +199,11 @@ public class MatchingEngine {
             rejection
         );
         eventBus.publish(rejectionEvent);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(rejection, 3);
+        }
     }
     
     /**
@@ -194,14 +222,39 @@ public class MatchingEngine {
             orderEvent.side(),
             orderEvent.price(),
             orderEvent.quantity(),
-            timestamp
+            timestamp,
+            orderEvent.orderType(),
+            orderEvent.timeInForce()
         );
+        
+        // Check if FOK order can be fully filled before attempting match
+        if (orderEvent.isFOK()) {
+            long availableLiquidity = calculateAvailableLiquidity(book, order);
+            if (availableLiquidity < order.quantity()) {
+                // FOK order cannot be fully filled - reject entire order
+                cancelOrder(orderEvent, "FOK order cannot be fully filled");
+                return;
+            }
+        }
         
         // Attempt to match the order
         long remainingQuantity = matchOrder(book, order, orderEvent);
         
-        // If order has remaining quantity, add to book
-        if (remainingQuantity > 0) {
+        // Handle IOC orders - cancel any unfilled portion
+        if (orderEvent.isIOC() && remainingQuantity > 0) {
+            cancelOrder(orderEvent, "IOC order - cancel unfilled portion");
+            return;
+        }
+        
+        // Handle FOK orders - should be fully filled at this point
+        if (orderEvent.isFOK() && remainingQuantity > 0) {
+            // This shouldn't happen if liquidity check was correct
+            cancelOrder(orderEvent, "FOK order partially filled - cancelling");
+            return;
+        }
+        
+        // If order has remaining quantity, add to book (GTC or DAY orders only)
+        if (remainingQuantity > 0 && !orderEvent.isMarketOrder()) {
             Order residualOrder = order.withQuantity(remainingQuantity);
             book.addOrder(residualOrder);
             
@@ -210,8 +263,9 @@ public class MatchingEngine {
                 // Partial fill
                 publishPartialFillExecution(orderEvent, orderEvent.quantity() - remainingQuantity, remainingQuantity);
             }
-        } else {
-            // Fully filled - execution already published in matchOrder
+        } else if (remainingQuantity > 0 && orderEvent.isMarketOrder()) {
+            // Market order with unfilled quantity - publish as partially filled with cancel
+            cancelOrder(orderEvent, "Market order exhausted liquidity");
         }
     }
     
@@ -237,9 +291,9 @@ public class MatchingEngine {
             }
             
             // Check if prices cross (can match)
-            boolean canMatch = order.isBuy() ? 
-                (order.price() >= bestPrice) : 
-                (order.price() <= bestPrice);
+            // For MARKET orders, always match at any price
+            boolean canMatch = order.isMarketOrder() || 
+                (order.isBuy() ? (order.price() >= bestPrice) : (order.price() <= bestPrice));
             
             if (!canMatch) {
                 // No matching price
@@ -274,6 +328,96 @@ public class MatchingEngine {
         }
         
         return remainingQty;
+    }
+    
+    /**
+     * Calculates available liquidity for an order to determine if FOK can be filled.
+     * 
+     * @param book Order book
+     * @param order Order to check liquidity for
+     * @return Total quantity available at acceptable price levels
+     */
+    private long calculateAvailableLiquidity(LimitOrderBook book, Order order) {
+        long availableLiquidity = 0;
+        boolean isBuy = order.isBuy();
+        
+        // For market orders, sum all liquidity on opposite side
+        if (order.isMarketOrder()) {
+            var levels = isBuy ? book.getAskLevels(Integer.MAX_VALUE) : book.getBidLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                availableLiquidity += level.getTotalQuantity();
+            }
+            return availableLiquidity;
+        }
+        
+        // For limit orders, sum liquidity at prices that would match
+        if (isBuy) {
+            // Buy order: sum ask levels at or below order price
+            var levels = book.getAskLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                if (level.getPrice() <= order.price()) {
+                    availableLiquidity += level.getTotalQuantity();
+                } else {
+                    break; // Levels are sorted, no need to check further
+                }
+            }
+        } else {
+            // Sell order: sum bid levels at or above order price
+            var levels = book.getBidLevels(Integer.MAX_VALUE);
+            for (var level : levels) {
+                if (level.getPrice() >= order.price()) {
+                    availableLiquidity += level.getTotalQuantity();
+                } else {
+                    break; // Levels are sorted, no need to check further
+                }
+            }
+        }
+        
+        return availableLiquidity;
+    }
+    
+    /**
+     * Cancels an order and publishes cancellation event.
+     * 
+     * @param orderEvent Order to cancel
+     * @param reason Cancellation reason
+     */
+    private void cancelOrder(OrderEvent orderEvent, String reason) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create cancellation execution event
+        ExecutionEvent execution = new ExecutionEvent(
+            executionId,
+            orderEvent.orderId(),
+            orderEvent.symbol(),
+            orderEvent.side(),
+            ExecutionEvent.EXEC_TYPE_CANCELLED,
+            ExecutionEvent.STATUS_CANCELLED,
+            0L, // Last fill qty
+            0L, // Last fill price
+            0L, // Cumulative filled
+            orderEvent.quantity(), // Leaves qty
+            timestamp,
+            orderEvent.account(),
+            orderEvent.exchange(),
+            0   // no rejection
+        );
+        
+        Event executionEventWrapper = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_CANCELLED,
+            0L,
+            execution
+        );
+        eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
@@ -342,6 +486,11 @@ public class MatchingEngine {
         );
         eventBus.publish(tradeEventWrapper);
         
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishTradeWithRetry(trade, 3);
+        }
+        
         // Create execution event for incoming order
         long cumulativeFilled = incomingOrder.quantity() - (incomingOrder.quantity() - fillQty);
         long leavesQty = incomingOrder.quantity() - cumulativeFilled;
@@ -365,6 +514,11 @@ public class MatchingEngine {
             execution
         );
         eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
@@ -396,6 +550,11 @@ public class MatchingEngine {
             execution
         );
         eventBus.publish(executionEventWrapper);
+        
+        // Also publish to external ExecutionPublisher if configured
+        if (executionPublisher != null) {
+            executionPublisher.publishExecutionWithRetry(execution, 3);
+        }
     }
     
     /**
@@ -496,4 +655,323 @@ public class MatchingEngine {
         long totalTrades,
         long currentSequence
     ) {}
+    
+    // ========================================
+    // MatchingEngineInterface Implementation
+    // ========================================
+    
+    /**
+     * Processes a new order request wrapped in an envelope.
+     * 
+     * @param envelope Order envelope containing order event and metadata
+     */
+    @Override
+    public void onNewOrder(OrderEnvelope envelope) {
+        if (envelope == null) {
+            return;
+        }
+        
+        // Track sequence for deterministic replay
+        long sequence = sequenceTracker.incrementAndGet();
+        
+        OrderEvent orderEvent = envelope.orderEvent();
+        
+        // Pre-trade risk validation (inline, synchronous)
+        RiskDecision riskDecision = riskValidator.validate(orderEvent);
+        
+        if (!riskDecision.approved()) {
+            // Reject order and publish rejection event
+            rejectOrder(orderEvent, riskDecision.reasonCode());
+            return;
+        }
+        
+        // Process the order if risk check passed
+        processOrder(orderEvent, envelope.receivedTime());
+    }
+    
+    /**
+     * Processes an order cancellation request.
+     * 
+     * @param cancel Cancel request with order identifier
+     */
+    @Override
+    public void onCancel(OrderCancel cancel) {
+        if (cancel == null) {
+            return;
+        }
+        
+        // Track sequence for deterministic replay
+        long sequence = sequenceTracker.incrementAndGet();
+        
+        LimitOrderBook book = books.get(cancel.symbol());
+        if (book == null) {
+            // Symbol not found - publish rejection
+            publishCancelRejection(cancel, "Symbol not found");
+            return;
+        }
+        
+        // Try to remove the order from the book
+        Order removed = book.removeOrder(cancel.orderId());
+        if (removed == null) {
+            // Order not found - publish rejection
+            publishCancelRejection(cancel, "Order not found");
+            return;
+        }
+        
+        // Publish cancellation execution event
+        publishCancellationExecution(cancel, removed);
+    }
+    
+    /**
+     * Processes an order modification (replace) request.
+     * 
+     * @param modify Modification request with new price/quantity
+     */
+    @Override
+    public void onReplace(OrderModify modify) {
+        if (modify == null) {
+            return;
+        }
+        
+        // Track sequence for deterministic replay
+        long sequence = sequenceTracker.incrementAndGet();
+        
+        LimitOrderBook book = books.get(modify.symbol());
+        if (book == null) {
+            // Symbol not found - publish rejection
+            publishModifyRejection(modify, "Symbol not found");
+            return;
+        }
+        
+        // Remove the existing order (loses time priority on modification)
+        Order existingOrder = book.removeOrder(modify.orderId());
+        if (existingOrder == null) {
+            // Order not found - publish rejection
+            publishModifyRejection(modify, "Order not found");
+            return;
+        }
+        
+        // Create modified order with new price/quantity
+        long newPrice = modify.modifiesPrice() ? modify.newPrice() : existingOrder.price();
+        long newQuantity = modify.modifiesQuantity() ? modify.newQuantity() : existingOrder.quantity();
+        
+        Order modifiedOrder = new Order(
+            existingOrder.orderId(),
+            existingOrder.symbol(),
+            existingOrder.side(),
+            newPrice,
+            newQuantity,
+            System.nanoTime(), // New timestamp - loses time priority
+            existingOrder.orderType(),
+            existingOrder.timeInForce()
+        );
+        
+        // Create corresponding OrderEvent for matching
+        OrderEvent modifiedOrderEvent = new OrderEvent(
+            modifiedOrder.orderId(),
+            modifiedOrder.symbol(),
+            modifiedOrder.side(),
+            modifiedOrder.orderType(),
+            modifiedOrder.quantity(),
+            modifiedOrder.price(),
+            modifiedOrder.timestamp(),
+            OrderEvent.STATUS_NEW,
+            modify.account(),
+            0, // exchange
+            modifiedOrder.timeInForce()
+        );
+        
+        // Try to match the modified order
+        long remainingQuantity = matchOrder(book, modifiedOrder, modifiedOrderEvent);
+        
+        // If order has remaining quantity, add back to book
+        if (remainingQuantity > 0) {
+            Order residualOrder = modifiedOrder.withQuantity(remainingQuantity);
+            book.addOrder(residualOrder);
+        }
+        
+        // Publish modification execution event
+        publishModifyExecution(modify, modifiedOrder, remainingQuantity);
+    }
+    
+    /**
+     * Processes a market data tick update.
+     * 
+     * @param tick Market data tick event
+     */
+    @Override
+    public void onMarketDataUpdate(TickEvent tick) {
+        if (tick == null) {
+            return;
+        }
+        
+        // Track sequence for deterministic replay
+        long sequence = sequenceTracker.incrementAndGet();
+        
+        // For now, just track the update
+        // Future enhancements:
+        // - Trigger stop orders based on market price
+        // - Update reference prices for stop order evaluation
+        // - Validate against internal order book state
+        
+        // Publish market data event for downstream consumers
+        Event marketDataEvent = Event.create(
+            tick.timestamp(),
+            eventBus.getCurrentSequence() + 1,
+            SourceId.FEED_HANDLER,
+            EventType.MARKET_DATA_UPDATE,
+            0L,
+            tick
+        );
+        eventBus.publish(marketDataEvent);
+    }
+    
+    /**
+     * Publishes a cancel rejection event.
+     * 
+     * @param cancel Cancel request
+     * @param reason Rejection reason
+     */
+    private void publishCancelRejection(OrderCancel cancel, String reason) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create a synthetic OrderEvent for the rejection
+        OrderEvent syntheticOrder = OrderEvent.newOrder(
+            cancel.orderId(),
+            cancel.symbol(),
+            OrderEvent.SIDE_BUY, // Side doesn't matter for rejection
+            OrderEvent.TYPE_LIMIT,
+            1L, // Minimum valid quantity
+            0L, // Price doesn't matter
+            cancel.account(),
+            0
+        );
+        
+        ExecutionEvent rejection = ExecutionEvent.reject(executionId, syntheticOrder, 404); // 404 = not found
+        
+        Event rejectionEvent = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_REJECTED,
+            0L,
+            rejection
+        );
+        eventBus.publish(rejectionEvent);
+    }
+    
+    /**
+     * Publishes a cancellation execution event.
+     * 
+     * @param cancel Cancel request
+     * @param removedOrder The order that was cancelled
+     */
+    private void publishCancellationExecution(OrderCancel cancel, Order removedOrder) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create execution event for cancellation
+        ExecutionEvent execution = new ExecutionEvent(
+            executionId,
+            removedOrder.orderId(),
+            removedOrder.symbol(),
+            removedOrder.side(),
+            ExecutionEvent.EXEC_TYPE_CANCELLED,
+            ExecutionEvent.STATUS_CANCELLED,
+            0L, // Last fill qty
+            0L, // Last fill price
+            0L, // Cumulative filled
+            removedOrder.quantity(), // Leaves qty (now 0 after cancel)
+            timestamp,
+            cancel.account(),
+            0,  // exchange
+            0   // no rejection
+        );
+        
+        Event executionEventWrapper = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_CANCELLED,
+            0L,
+            execution
+        );
+        eventBus.publish(executionEventWrapper);
+    }
+    
+    /**
+     * Publishes a modify rejection event.
+     * 
+     * @param modify Modify request
+     * @param reason Rejection reason
+     */
+    private void publishModifyRejection(OrderModify modify, String reason) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create a synthetic OrderEvent for the rejection
+        OrderEvent syntheticOrder = OrderEvent.newOrder(
+            modify.orderId(),
+            modify.symbol(),
+            OrderEvent.SIDE_BUY,
+            OrderEvent.TYPE_LIMIT,
+            modify.newQuantity() > 0 ? modify.newQuantity() : 1L, // Use new quantity if valid, else minimum
+            modify.newPrice() > 0 ? modify.newPrice() : 1L,       // Use new price if valid, else minimum
+            modify.account(),
+            0
+        );
+        
+        ExecutionEvent rejection = ExecutionEvent.reject(executionId, syntheticOrder, 404);
+        
+        Event rejectionEvent = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_REJECTED,
+            0L,
+            rejection
+        );
+        eventBus.publish(rejectionEvent);
+    }
+    
+    /**
+     * Publishes a modify execution event.
+     * 
+     * @param modify Modify request
+     * @param modifiedOrder Modified order
+     * @param remainingQty Remaining quantity after matching
+     */
+    private void publishModifyExecution(OrderModify modify, Order modifiedOrder, long remainingQty) {
+        long executionId = executionIdCounter.incrementAndGet();
+        long timestamp = System.nanoTime();
+        
+        // Create execution event for modification
+        ExecutionEvent execution = new ExecutionEvent(
+            executionId,
+            modifiedOrder.orderId(),
+            modifiedOrder.symbol(),
+            modifiedOrder.side(),
+            ExecutionEvent.EXEC_TYPE_REPLACED,
+            remainingQty == 0 ? ExecutionEvent.STATUS_FILLED : ExecutionEvent.STATUS_NEW,
+            0L, // Last fill qty
+            modifiedOrder.price(),
+            modifiedOrder.quantity() - remainingQty, // Cumulative filled
+            remainingQty, // Leaves qty
+            timestamp,
+            modify.account(),
+            0,  // exchange
+            0   // no rejection
+        );
+        
+        Event executionEventWrapper = Event.create(
+            timestamp,
+            eventBus.getCurrentSequence() + 1,
+            SourceId.MATCHING_ENGINE,
+            EventType.ORDER_MODIFIED,
+            0L,
+            execution
+        );
+        eventBus.publish(executionEventWrapper);
+    }
 }

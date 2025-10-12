@@ -23,6 +23,9 @@ dependencies {
     // Chronicle Map for off-heap collections
     implementation("net.openhft:chronicle-map:3.25ea5")
     
+    // Agrona for high-performance direct memory access
+    implementation("org.agrona:agrona:1.21.2")
+    
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")

@@ -18,8 +18,8 @@ class PriceLevelTest {
     
     @Test
     void testAddOrder() {
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         level.addOrder(order1);
         level.addOrder(order2);
@@ -30,7 +30,7 @@ class PriceLevelTest {
     
     @Test
     void testAddOrderInvalidPrice() {
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15001L, 100L, 1000L);
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15001L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         assertThrows(IllegalArgumentException.class, () -> {
             level.addOrder(order);
@@ -39,8 +39,8 @@ class PriceLevelTest {
     
     @Test
     void testRemoveOrder() {
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         level.addOrder(order1);
         level.addOrder(order2);
@@ -54,8 +54,8 @@ class PriceLevelTest {
     
     @Test
     void testUpdateOrder() {
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         level.addOrder(order1);
         level.addOrder(order2);
@@ -69,8 +69,8 @@ class PriceLevelTest {
     
     @Test
     void testPeek() {
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         assertNull(level.peek());
         
@@ -85,8 +85,8 @@ class PriceLevelTest {
     
     @Test
     void testPoll() {
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         assertNull(level.poll());
         
@@ -110,7 +110,7 @@ class PriceLevelTest {
     void testIsEmpty() {
         assertTrue(level.isEmpty());
         
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         level.addOrder(order);
         
         assertFalse(level.isEmpty());
@@ -127,9 +127,9 @@ class PriceLevelTest {
     @Test
     void testPriceTimePriority() {
         // Add orders with different timestamps
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L);
-        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 150L, 3000L);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, 1000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, 2000L, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 150L, 3000L, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         level.addOrder(order1);
         level.addOrder(order2);
