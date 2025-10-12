@@ -314,7 +314,7 @@ class OrderStateMachineTest {
         assertEquals(OrderState.CANCELLED, stateMachine.getCurrentState());
         assertTrue(stateMachine.isTerminal());
         assertFalse(stateMachine.isFilled());
-        assertTrue(stateMachine.isCancellable() == false);
+        assertFalse(stateMachine.isCancellable());
     }
     
     @Test

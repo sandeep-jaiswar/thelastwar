@@ -103,19 +103,7 @@ public record Allocation(
         return fillPrice * fillQuantity;
     }
     
-    /**
-     * Checks if this allocation is for a buy order.
-     * Note: This requires additional context not stored in the allocation.
-     * Consider adding a side field if this check is needed frequently.
-     * 
-     * @return always false (placeholder - requires side information)
-     */
-    public boolean isBuy() {
-        // This method is a placeholder. In a real system, we would either:
-        // 1. Add a 'side' field to the Allocation record, or
-        // 2. Look up the order details from the order store
-        return false;
-    }
+
     
     /**
      * Creates a formatted string representation of this allocation.

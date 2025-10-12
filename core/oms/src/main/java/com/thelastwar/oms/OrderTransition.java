@@ -150,35 +150,40 @@ public enum OrderTransition {
         return description;
     }
     
+    // Pre-computed map for O(1) transition lookups (performance optimization)
+    private static final java.util.Map<String, OrderTransition> TRANSITION_MAP;
+    
+    static {
+        TRANSITION_MAP = new java.util.HashMap<>();
+        for (OrderTransition transition : values()) {
+            String key = transition.fromState + ":" + transition.toState;
+            TRANSITION_MAP.put(key, transition);
+        }
+    }
+    
     /**
      * Checks if this transition is valid from the given state to the target state.
+     * Performance: O(1) using pre-computed map.
      * 
      * @param from The current state
      * @param to The target state
      * @return true if a transition exists from the given state to target state
      */
     public static boolean isValidTransition(OrderState from, OrderState to) {
-        for (OrderTransition transition : values()) {
-            if (transition.fromState == from && transition.toState == to) {
-                return true;
-            }
-        }
-        return false;
+        String key = from + ":" + to;
+        return TRANSITION_MAP.containsKey(key);
     }
     
     /**
      * Finds the transition for the given state change.
+     * Performance: O(1) using pre-computed map.
      * 
      * @param from The current state
      * @param to The target state
      * @return the OrderTransition if valid, null otherwise
      */
     public static OrderTransition findTransition(OrderState from, OrderState to) {
-        for (OrderTransition transition : values()) {
-            if (transition.fromState == from && transition.toState == to) {
-                return transition;
-            }
-        }
-        return null;
+        String key = from + ":" + to;
+        return TRANSITION_MAP.get(key);
     }
 }
