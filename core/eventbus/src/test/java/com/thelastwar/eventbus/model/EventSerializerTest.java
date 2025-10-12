@@ -188,7 +188,8 @@ class EventSerializerTest {
                 System.nanoTime(),
                 OrderEvent.STATUS_PARTIALLY_FILLED,
                 888888888L,
-                9999
+                9999,
+                OrderEvent.TIF_FOK
         );
         
         ByteBuffer buffer = ByteBuffer.allocate(EventSerializer.getOrderEventSize());

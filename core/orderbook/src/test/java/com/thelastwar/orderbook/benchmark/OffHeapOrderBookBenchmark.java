@@ -45,7 +45,7 @@ public class OffHeapOrderBookBenchmark {
             long price = 15000L + (i % 100);
             byte side = i % 2 == 0 ? Order.SIDE_BUY : Order.SIDE_SELL;
             
-            book.addOrder(new Order(id, "AAPL", side, price, 100L, timestamp++));
+            book.addOrder(new Order(id, "AAPL", side, price, 100L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC));
         }
     }
     
@@ -62,7 +62,7 @@ public class OffHeapOrderBookBenchmark {
     @Benchmark
     public boolean benchmarkAddOrder() {
         long id = orderId++;
-        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L + (id % 100), 100L, timestamp++);
+        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L + (id % 100), 100L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         return book.addOrder(order);
     }
     
@@ -73,7 +73,7 @@ public class OffHeapOrderBookBenchmark {
     public boolean benchmarkRemoveOrder() {
         // Add an order first
         long id = orderId++;
-        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp++);
+        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order);
         
         // Now remove it
@@ -145,7 +145,7 @@ public class OffHeapOrderBookBenchmark {
     @Benchmark
     public boolean benchmarkEquityOrderBook() {
         long id = orderId++;
-        Order order = new Order(id, "GOOGL", Order.SIDE_BUY, 140000L, 100L, timestamp++);
+        Order order = new Order(id, "GOOGL", Order.SIDE_BUY, 140000L, 100L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         return equityBook.addOrder(order);
     }
     
@@ -155,7 +155,7 @@ public class OffHeapOrderBookBenchmark {
     @Benchmark
     public boolean benchmarkBondOrderBook() {
         long id = orderId++;
-        Order order = new Order(id, "US10Y", Order.SIDE_BUY, 9500L, 1000000L, timestamp++);
+        Order order = new Order(id, "US10Y", Order.SIDE_BUY, 9500L, 1000000L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         return bondBook.addOrder(order);
     }
     
@@ -165,7 +165,7 @@ public class OffHeapOrderBookBenchmark {
     @Benchmark
     public boolean benchmarkDerivativeOrderBook() {
         long id = orderId++;
-        Order order = new Order(id, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, timestamp++);
+        Order order = new Order(id, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         return derivativeBook.addOrder(order);
     }
     
@@ -177,7 +177,7 @@ public class OffHeapOrderBookBenchmark {
         long id = orderId++;
         
         // Add order
-        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L + (id % 50), 100L, timestamp++);
+        Order order = new Order(id, "AAPL", Order.SIDE_BUY, 15000L + (id % 50), 100L, timestamp++, Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order);
         
         // Get best bid/ask

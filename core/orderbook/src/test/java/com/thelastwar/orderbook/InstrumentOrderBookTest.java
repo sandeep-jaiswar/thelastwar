@@ -17,7 +17,7 @@ class InstrumentOrderBookTest {
         assertEquals(InstrumentType.EQUITY, book.getInstrumentType());
         
         // Test basic operations
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(book.addOrder(order));
         assertEquals(1, book.getOrderCount());
         assertEquals(15000L, book.getBestBid());
@@ -31,7 +31,7 @@ class InstrumentOrderBookTest {
         assertEquals(InstrumentType.BOND, book.getInstrumentType());
         
         // Test basic operations
-        Order order = new Order(1L, "US10Y", Order.SIDE_SELL, 9500L, 1000000L, System.nanoTime());
+        Order order = new Order(1L, "US10Y", Order.SIDE_SELL, 9500L, 1000000L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(book.addOrder(order));
         assertEquals(1, book.getOrderCount());
         assertEquals(9500L, book.getBestAsk());
@@ -45,7 +45,7 @@ class InstrumentOrderBookTest {
         assertEquals(InstrumentType.DERIVATIVE, book.getInstrumentType());
         
         // Test basic operations
-        Order order = new Order(1L, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, System.nanoTime());
+        Order order = new Order(1L, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(book.addOrder(order));
         assertEquals(1, book.getOrderCount());
         assertEquals(450000L, book.getBestBid());
@@ -58,9 +58,9 @@ class InstrumentOrderBookTest {
         BondOrderBook bond = new BondOrderBook("US10Y");
         DerivativeOrderBook derivative = new DerivativeOrderBook("ES_MAR25");
         
-        equity.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
-        bond.addOrder(new Order(2L, "US10Y", Order.SIDE_BUY, 9500L, 1000000L, System.nanoTime()));
-        derivative.addOrder(new Order(3L, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, System.nanoTime()));
+        equity.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        bond.addOrder(new Order(2L, "US10Y", Order.SIDE_BUY, 9500L, 1000000L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        derivative.addOrder(new Order(3L, "ES_MAR25", Order.SIDE_BUY, 450000L, 10L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(1, equity.getOrderCount());
         assertEquals(1, bond.getOrderCount());

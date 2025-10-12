@@ -20,7 +20,8 @@ class OrderEventTest {
                 System.nanoTime(),
                 OrderEvent.STATUS_NEW,
                 999L,
-                1
+                1,
+                OrderEvent.TIF_GTC
         );
         
         assertEquals(12345L, order.orderId());
@@ -32,6 +33,7 @@ class OrderEventTest {
         assertEquals(OrderEvent.STATUS_NEW, order.status());
         assertEquals(999L, order.account());
         assertEquals(1, order.exchange());
+        assertEquals(OrderEvent.TIF_GTC, order.timeInForce());
     }
     
     @Test
@@ -67,7 +69,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
     }
@@ -85,7 +88,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
         
@@ -100,7 +104,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
     }
@@ -118,7 +123,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
     }
@@ -136,7 +142,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
     }
@@ -154,7 +161,8 @@ class OrderEventTest {
                     System.nanoTime(),
                     OrderEvent.STATUS_NEW,
                     999L,
-                    1
+                    1,
+                    OrderEvent.TIF_GTC
             );
         });
     }

@@ -325,7 +325,7 @@ public class MappedOrderStateStore implements OrderStateStore {
         long quantity = buffer.getLong();
         long timestamp = buffer.getLong();
         
-        return new Order(orderId, symbol, side, price, quantity, timestamp);
+        return new Order(orderId, symbol, side, price, quantity, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC);
     }
     
     private void checkNotClosed() {

@@ -45,7 +45,9 @@ public class OrderBookBenchmark {
                     Order.SIDE_BUY,
                     15000L - i,
                     100L,
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         }
         
@@ -57,7 +59,9 @@ public class OrderBookBenchmark {
                     Order.SIDE_SELL,
                     15100L + i,
                     100L,
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         }
     }
@@ -71,7 +75,9 @@ public class OrderBookBenchmark {
                 Order.SIDE_BUY,
                 14900L - (orderId % 100),
                 100L,
-                System.nanoTime()
+                System.nanoTime(),
+                Order.TYPE_LIMIT,
+                Order.TIF_GTC
         );
         bh.consume(book.addOrder(order));
     }
@@ -85,7 +91,9 @@ public class OrderBookBenchmark {
                 Order.SIDE_SELL,
                 15200L + (orderId % 100),
                 100L,
-                System.nanoTime()
+                System.nanoTime(),
+                Order.TYPE_LIMIT,
+                Order.TIF_GTC
         );
         bh.consume(book.addOrder(order));
     }
@@ -104,7 +112,9 @@ public class OrderBookBenchmark {
                     Order.SIDE_BUY,
                     15000L - removeId,
                     100L,
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         } else {
             book.addOrder(new Order(
@@ -113,7 +123,9 @@ public class OrderBookBenchmark {
                     Order.SIDE_SELL,
                     15100L + (removeId - 100),
                     100L,
-                    System.nanoTime()
+                    System.nanoTime(),
+                    Order.TYPE_LIMIT,
+                    Order.TIF_GTC
             ));
         }
         orderIdCounter++;
@@ -170,7 +182,7 @@ public class OrderBookBenchmark {
                 ? 14900L - (orderId % 100)
                 : 15200L + (orderId % 100);
             
-            Order order = new Order(orderId, "AAPL", side, price, 100L, System.nanoTime());
+            Order order = new Order(orderId, "AAPL", side, price, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
             bh.consume(book.addOrder(order));
             
         } else if (op < 60) {

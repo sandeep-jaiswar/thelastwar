@@ -19,7 +19,7 @@ class OffHeapOrderBookTest {
     
     @Test
     void testAddOrder() {
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertTrue(book.addOrder(order));
         assertEquals(1, book.getOrderCount());
         assertFalse(book.isEmpty());
@@ -28,7 +28,7 @@ class OffHeapOrderBookTest {
     @Test
     void testAddMultipleOrders() {
         for (long i = 1; i <= 100; i++) {
-            Order order = new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, System.nanoTime());
+            Order order = new Order(i, "AAPL", Order.SIDE_BUY, 15000L + i, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
             assertTrue(book.addOrder(order));
         }
         assertEquals(100, book.getOrderCount());
@@ -36,7 +36,7 @@ class OffHeapOrderBookTest {
     
     @Test
     void testRemoveOrder() {
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order);
         
         assertTrue(book.removeOrder(1L));
@@ -51,7 +51,7 @@ class OffHeapOrderBookTest {
     
     @Test
     void testUpdateOrder() {
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order);
         
         assertTrue(book.updateOrder(1L, 200L));
@@ -68,7 +68,7 @@ class OffHeapOrderBookTest {
     
     @Test
     void testGetOrder() {
-        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         book.addOrder(order);
         
         Order retrieved = book.getOrder(1L);
@@ -87,32 +87,32 @@ class OffHeapOrderBookTest {
     
     @Test
     void testBestBid() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15000L, book.getBestBid());
         
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 100L, System.nanoTime()));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15100L, book.getBestBid());
         
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14900L, 100L, System.nanoTime()));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14900L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15100L, book.getBestBid());
     }
     
     @Test
     void testBestAsk() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15100L, book.getBestAsk());
         
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime()));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15000L, book.getBestAsk());
         
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 100L, System.nanoTime()));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(15000L, book.getBestAsk());
     }
     
     @Test
     void testBestBidAfterRemoval() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(15100L, book.getBestBid());
         
@@ -125,8 +125,8 @@ class OffHeapOrderBookTest {
     
     @Test
     void testBestAskAfterRemoval() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(15000L, book.getBestAsk());
         
@@ -139,32 +139,32 @@ class OffHeapOrderBookTest {
     
     @Test
     void testSpread() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(100L, book.getSpread());
     }
     
     @Test
     void testSpreadOneSided() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         assertEquals(0L, book.getSpread());
     }
     
     @Test
     void testBestBidQuantity() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime()));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14900L, 150L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14900L, 150L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(300L, book.getBestBidQuantity());
     }
     
     @Test
     void testBestAskQuantity() {
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 200L, System.nanoTime()));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 150L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15100L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 150L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(300L, book.getBestAskQuantity());
     }
@@ -174,9 +174,9 @@ class OffHeapOrderBookTest {
         long t0 = System.nanoTime();
         
         // Add three orders at same price with different timestamps
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, t0));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, t0 + 1000));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, t0 + 2000));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, t0, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, t0 + 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, t0 + 2000, Order.TYPE_LIMIT, Order.TIF_GTC));
         
         // Initially should have total of 600
         assertEquals(600L, book.getBestBidQuantity());
@@ -197,7 +197,7 @@ class OffHeapOrderBookTest {
     
     @Test
     void testInvalidSymbol() {
-        Order order = new Order(1L, "GOOGL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime());
+        Order order = new Order(1L, "GOOGL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
         assertThrows(IllegalArgumentException.class, () -> book.addOrder(order));
     }
     
@@ -209,14 +209,14 @@ class OffHeapOrderBookTest {
     @Test
     void testDepthSnapshot() {
         // Add bid orders
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 14900L, 200L, System.nanoTime()));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14800L, 150L, System.nanoTime()));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 14900L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 14800L, 150L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         // Add ask orders
-        book.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime()));
-        book.addOrder(new Order(5L, "AAPL", Order.SIDE_SELL, 15200L, 200L, System.nanoTime()));
-        book.addOrder(new Order(6L, "AAPL", Order.SIDE_SELL, 15300L, 150L, System.nanoTime()));
+        book.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(5L, "AAPL", Order.SIDE_SELL, 15200L, 200L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(6L, "AAPL", Order.SIDE_SELL, 15300L, 150L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         
         OffHeapOrderBook.PriceLevelSnapshot[] depth = book.getDepthSnapshot(5);
         
@@ -232,7 +232,7 @@ class OffHeapOrderBookTest {
         for (long i = 1; i <= 10000; i++) {
             Order order = new Order(i, "AAPL", 
                 i % 2 == 0 ? Order.SIDE_BUY : Order.SIDE_SELL,
-                15000L + (i % 100), 100L, System.nanoTime());
+                15000L + (i % 100), 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC);
             book.addOrder(order);
         }
         
@@ -258,7 +258,7 @@ class OffHeapOrderBookTest {
     void testRemoveAndReAddOrders() {
         // Add orders
         for (long i = 1; i <= 100; i++) {
-            book.addOrder(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
+            book.addOrder(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         // Remove all orders
@@ -270,7 +270,7 @@ class OffHeapOrderBookTest {
         
         // Re-add orders
         for (long i = 101; i <= 200; i++) {
-            book.addOrder(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime()));
+            book.addOrder(new Order(i, "AAPL", Order.SIDE_BUY, 15000L, 100L, System.nanoTime(), Order.TYPE_LIMIT, Order.TIF_GTC));
         }
         
         assertEquals(100, book.getOrderCount());

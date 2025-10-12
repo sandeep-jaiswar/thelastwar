@@ -26,7 +26,8 @@ public final class EventSerializer {
     private static final int MAX_SYMBOL_LENGTH = 16;
     
     // Buffer sizes for each event type (pre-calculated for performance)
-    private static final int ORDER_EVENT_SIZE = 8 + MAX_SYMBOL_LENGTH + 1 + 1 + 8 + 8 + 8 + 1 + 8 + 4;
+    // ORDER_EVENT_SIZE: orderId(8) + symbol(16) + side(1) + orderType(1) + quantity(8) + price(8) + timestamp(8) + status(1) + account(8) + exchange(4) + timeInForce(1)
+    private static final int ORDER_EVENT_SIZE = 8 + MAX_SYMBOL_LENGTH + 1 + 1 + 8 + 8 + 8 + 1 + 8 + 4 + 1;
     private static final int TRADE_EVENT_SIZE = 8 + 8 + MAX_SYMBOL_LENGTH + 1 + 8 + 8 + 8 + 8 + 4 + 8 + 8;
     private static final int EXECUTION_EVENT_SIZE = 8 + 8 + MAX_SYMBOL_LENGTH + 1 + 1 + 1 + 8 + 8 + 8 + 8 + 8 + 8 + 4 + 4;
     
@@ -52,6 +53,7 @@ public final class EventSerializer {
         buffer.put(event.status());
         buffer.putLong(event.account());
         buffer.putInt(event.exchange());
+        buffer.put(event.timeInForce());
     }
     
     /**
@@ -72,9 +74,10 @@ public final class EventSerializer {
         byte status = buffer.get();
         long account = buffer.getLong();
         int exchange = buffer.getInt();
+        byte timeInForce = buffer.get();
         
         return new OrderEvent(orderId, symbol, side, orderType, quantity, price,
-                timestamp, status, account, exchange);
+                timestamp, status, account, exchange, timeInForce);
     }
     
     /**

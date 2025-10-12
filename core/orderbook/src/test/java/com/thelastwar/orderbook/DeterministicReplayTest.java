@@ -34,10 +34,10 @@ class DeterministicReplayTest {
     @Test
     void testStrictFIFOOrderingAtSamePrice() {
         // Create orders at same price with sequential timestamps
-        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp);
-        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000);
-        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000);
-        Order order4 = new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 150L, timestamp + 3000);
+        Order order1 = new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order2 = new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order3 = new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC);
+        Order order4 = new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 150L, timestamp + 3000, Order.TYPE_LIMIT, Order.TIF_GTC);
         
         // Add orders in sequence
         book.addOrder(order1);
@@ -71,10 +71,10 @@ class DeterministicReplayTest {
         List<OrderOperation> operations = new ArrayList<>();
         
         // Add operations
-        operations.add(new OrderOperation(OpType.ADD, new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp)));
-        operations.add(new OrderOperation(OpType.ADD, new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 1000)));
-        operations.add(new OrderOperation(OpType.ADD, new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 150L, timestamp + 2000)));
-        operations.add(new OrderOperation(OpType.ADD, new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 250L, timestamp + 3000)));
+        operations.add(new OrderOperation(OpType.ADD, new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC)));
+        operations.add(new OrderOperation(OpType.ADD, new Order(2L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC)));
+        operations.add(new OrderOperation(OpType.ADD, new Order(3L, "AAPL", Order.SIDE_SELL, 15200L, 150L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC)));
+        operations.add(new OrderOperation(OpType.ADD, new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 250L, timestamp + 3000, Order.TYPE_LIMIT, Order.TIF_GTC)));
         
         // Execute operations
         for (OrderOperation op : operations) {
@@ -104,9 +104,9 @@ class DeterministicReplayTest {
     @Test
     void testPriceTimePriorityAcrossCycles() {
         // Cycle 1: Add three orders at same price
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC));
         
         long qty1 = book.getBestBidQuantity();
         assertEquals(600L, qty1);
@@ -117,7 +117,7 @@ class DeterministicReplayTest {
         assertEquals(400L, qty2);
         
         // Add another order - should go to end of queue
-        book.addOrder(new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 150L, timestamp + 3000));
+        book.addOrder(new Order(4L, "AAPL", Order.SIDE_BUY, 15000L, 150L, timestamp + 3000, Order.TYPE_LIMIT, Order.TIF_GTC));
         long qty3 = book.getBestBidQuantity();
         assertEquals(550L, qty3);
         
@@ -139,11 +139,11 @@ class DeterministicReplayTest {
     @Test
     void testDeterministicBidAskInterleaving() {
         // Create deterministic sequence
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15200L, 100L, timestamp + 1000));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 2000));
-        book.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 150L, timestamp + 3000));
-        book.addOrder(new Order(5L, "AAPL", Order.SIDE_BUY, 15100L, 250L, timestamp + 4000));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15200L, 100L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 150L, timestamp + 3000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(5L, "AAPL", Order.SIDE_BUY, 15100L, 250L, timestamp + 4000, Order.TYPE_LIMIT, Order.TIF_GTC));
         
         // Verify state is deterministic
         assertEquals(15100L, book.getBestBid());
@@ -152,11 +152,11 @@ class DeterministicReplayTest {
         
         // Replay should give same result
         OffHeapOrderBook replay = new OffHeapOrderBook("AAPL");
-        replay.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp));
-        replay.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15200L, 100L, timestamp + 1000));
-        replay.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 2000));
-        replay.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 150L, timestamp + 3000));
-        replay.addOrder(new Order(5L, "AAPL", Order.SIDE_BUY, 15100L, 250L, timestamp + 4000));
+        replay.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC));
+        replay.addOrder(new Order(2L, "AAPL", Order.SIDE_SELL, 15200L, 100L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        replay.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15100L, 200L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        replay.addOrder(new Order(4L, "AAPL", Order.SIDE_SELL, 15100L, 150L, timestamp + 3000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        replay.addOrder(new Order(5L, "AAPL", Order.SIDE_BUY, 15100L, 250L, timestamp + 4000, Order.TYPE_LIMIT, Order.TIF_GTC));
         
         assertEquals(book.getBestBid(), replay.getBestBid());
         assertEquals(book.getBestAsk(), replay.getBestAsk());
@@ -169,9 +169,9 @@ class DeterministicReplayTest {
     @Test
     void testUpdatePreservesTimePriority() {
         // Add three orders at same price
-        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp));
-        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000));
-        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000));
+        book.addOrder(new Order(1L, "AAPL", Order.SIDE_BUY, 15000L, 100L, timestamp, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(2L, "AAPL", Order.SIDE_BUY, 15000L, 200L, timestamp + 1000, Order.TYPE_LIMIT, Order.TIF_GTC));
+        book.addOrder(new Order(3L, "AAPL", Order.SIDE_BUY, 15000L, 300L, timestamp + 2000, Order.TYPE_LIMIT, Order.TIF_GTC));
         
         // Update first order quantity
         book.updateOrder(1L, 150L);
@@ -207,7 +207,7 @@ class DeterministicReplayTest {
             
             operations.add(new OrderOperation(
                 OpType.ADD,
-                new Order(i, "AAPL", side, price, quantity, ts++)
+                new Order(i, "AAPL", side, price, quantity, ts++, Order.TYPE_LIMIT, Order.TIF_GTC)
             ));
         }
         

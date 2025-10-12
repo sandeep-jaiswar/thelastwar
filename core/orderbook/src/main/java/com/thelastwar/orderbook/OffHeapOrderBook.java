@@ -289,7 +289,9 @@ public class OffHeapOrderBook {
             sides.getByte(index * SIDE_SIZE),
             prices.getLong(index * PRICE_SIZE),
             quantities.getLong(index * QUANTITY_SIZE),
-            timestamps.getLong(index * TIMESTAMP_SIZE)
+            timestamps.getLong(index * TIMESTAMP_SIZE),
+            Order.TYPE_LIMIT,
+            Order.TIF_GTC
         );
     }
     
