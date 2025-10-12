@@ -1,0 +1,106 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "com.thelastwar.oms",
+  "doc": "Event representing a state change in an order's lifecycle",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": "long",
+      "doc": "Unique event identifier"
+    },
+    {
+      "name": "internalOrderId",
+      "type": "long",
+      "doc": "Internal order identifier"
+    },
+    {
+      "name": "clientOrderId",
+      "type": "string",
+      "doc": "Client order identifier"
+    },
+    {
+      "name": "eventType",
+      "type": {
+        "type": "enum",
+        "name": "OrderEventType",
+        "symbols": [
+          "ORDER_RECEIVED",
+          "ORDER_ACCEPTED",
+          "ORDER_REJECTED",
+          "ORDER_WORKING",
+          "ORDER_PARTIAL_FILL",
+          "ORDER_FILLED",
+          "ORDER_CANCELLED",
+          "ORDER_EXPIRED"
+        ]
+      },
+      "doc": "Type of order event"
+    },
+    {
+      "name": "previousState",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatePrevious",
+        "symbols": [
+          "NEW",
+          "ACCEPTED",
+          "WORKING",
+          "PARTIAL_FILL",
+          "FILLED",
+          "CANCELLED",
+          "REJECTED",
+          "EXPIRED"
+        ]
+      },
+      "doc": "State before this event"
+    },
+    {
+      "name": "newState",
+      "type": {
+        "type": "enum",
+        "name": "OrderStateNew",
+        "symbols": [
+          "NEW",
+          "ACCEPTED",
+          "WORKING",
+          "PARTIAL_FILL",
+          "FILLED",
+          "CANCELLED",
+          "REJECTED",
+          "EXPIRED"
+        ]
+      },
+      "doc": "State after this event"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Event timestamp in nanoseconds"
+    },
+    {
+      "name": "reason",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Optional reason for the state change (e.g., rejection reason)"
+    },
+    {
+      "name": "fillQuantity",
+      "type": "long",
+      "default": 0,
+      "doc": "Quantity filled (for fill events)"
+    },
+    {
+      "name": "fillPrice",
+      "type": "long",
+      "default": 0,
+      "doc": "Price of fill (for fill events)"
+    },
+    {
+      "name": "executionId",
+      "type": "long",
+      "default": 0,
+      "doc": "Execution ID (for fill events)"
+    }
+  ]
+}

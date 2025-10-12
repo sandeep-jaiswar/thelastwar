@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package com.thelastwar.oms;
+
+option java_package = "com.thelastwar.oms";
+option java_outer_classname = "OrderProto";
+option java_multiple_files = true;
+
+// Complete order representation with state information for the OMS
+message Order {
+  // System-assigned unique order identifier
+  int64 internal_order_id = 1;
+  
+  // Client-assigned unique order identifier (max 64 chars)
+  string client_order_id = 2;
+  
+  // Trading symbol/instrument
+  string symbol = 3;
+  
+  // Order side
+  enum Side {
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 2;
+  }
+  Side side = 4;
+  
+  // Order type
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    MARKET = 1;
+    LIMIT = 2;
+    STOP = 3;
+    STOP_LIMIT = 4;
+  }
+  Type order_type = 5;
+  
+  // Total order quantity (in lots or shares)
+  int64 quantity = 6;
+  
+  // Quantity already filled
+  int64 filled_quantity = 7;
+  
+  // Quantity remaining to be filled
+  int64 remaining_quantity = 8;
+  
+  // Order price (in minimum price increments)
+  int64 price = 9;
+  
+  // Average fill price across all executions
+  int64 average_fill_price = 10;
+  
+  // Current order state
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    NEW = 1;
+    ACCEPTED = 2;
+    WORKING = 3;
+    PARTIAL_FILL = 4;
+    FILLED = 5;
+    CANCELLED = 6;
+    REJECTED = 7;
+    EXPIRED = 8;
+  }
+  State state = 11;
+  
+  // Order creation timestamp in nanoseconds
+  int64 timestamp = 12;
+  
+  // Last state update timestamp in nanoseconds
+  int64 last_update_timestamp = 13;
+  
+  // Trading account identifier
+  int64 account = 14;
+  
+  // Trading venue/exchange identifier
+  string venue = 15;
+  
+  // Time in force
+  enum TimeInForce {
+    TIF_UNSPECIFIED = 0;
+    GTC = 1;  // Good Till Cancel
+    IOC = 2;  // Immediate Or Cancel
+    FOK = 3;  // Fill Or Kill
+    DAY = 4;  // Day order
+  }
+  TimeInForce time_in_force = 16;
+  
+  // List of allocations (fills) for this order
+  repeated Allocation allocations = 17;
+}
+
+// Represents a fill execution allocated to an order
+message Allocation {
+  // Unique allocation identifier
+  int64 allocation_id = 1;
+  
+  // Execution ID from matching engine
+  int64 execution_id = 2;
+  
+  // Price at which this allocation was executed
+  int64 fill_price = 3;
+  
+  // Quantity filled in this allocation
+  int64 fill_quantity = 4;
+  
+  // Timestamp when this allocation occurred (nanoseconds)
+  int64 fill_timestamp = 5;
+  
+  // Venue/exchange where execution occurred
+  string venue = 6;
+  
+  // Order ID of the counterparty (for audit)
+  int64 counterparty_order_id = 7;
+}

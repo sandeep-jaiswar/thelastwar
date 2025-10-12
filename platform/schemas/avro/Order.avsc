@@ -1,0 +1,166 @@
+{
+  "type": "record",
+  "name": "Order",
+  "namespace": "com.thelastwar.oms",
+  "doc": "Complete order representation with state information for the OMS",
+  "fields": [
+    {
+      "name": "internalOrderId",
+      "type": "long",
+      "doc": "System-assigned unique order identifier"
+    },
+    {
+      "name": "clientOrderId",
+      "type": "string",
+      "doc": "Client-assigned unique order identifier (max 64 chars)"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol/instrument"
+    },
+    {
+      "name": "side",
+      "type": {
+        "type": "enum",
+        "name": "OrderSide",
+        "symbols": ["BUY", "SELL"]
+      },
+      "doc": "Order side"
+    },
+    {
+      "name": "orderType",
+      "type": {
+        "type": "enum",
+        "name": "OrderType",
+        "symbols": ["MARKET", "LIMIT", "STOP", "STOP_LIMIT"]
+      },
+      "doc": "Order type"
+    },
+    {
+      "name": "quantity",
+      "type": "long",
+      "doc": "Total order quantity (in lots or shares)"
+    },
+    {
+      "name": "filledQuantity",
+      "type": "long",
+      "default": 0,
+      "doc": "Quantity already filled"
+    },
+    {
+      "name": "remainingQuantity",
+      "type": "long",
+      "doc": "Quantity remaining to be filled"
+    },
+    {
+      "name": "price",
+      "type": "long",
+      "doc": "Order price (in minimum price increments)"
+    },
+    {
+      "name": "averageFillPrice",
+      "type": "long",
+      "default": 0,
+      "doc": "Average fill price across all executions"
+    },
+    {
+      "name": "state",
+      "type": {
+        "type": "enum",
+        "name": "OrderState",
+        "symbols": [
+          "NEW",
+          "ACCEPTED",
+          "WORKING",
+          "PARTIAL_FILL",
+          "FILLED",
+          "CANCELLED",
+          "REJECTED",
+          "EXPIRED"
+        ]
+      },
+      "doc": "Current order state"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "doc": "Order creation timestamp in nanoseconds"
+    },
+    {
+      "name": "lastUpdateTimestamp",
+      "type": "long",
+      "doc": "Last state update timestamp in nanoseconds"
+    },
+    {
+      "name": "account",
+      "type": "long",
+      "doc": "Trading account identifier"
+    },
+    {
+      "name": "venue",
+      "type": "string",
+      "doc": "Trading venue/exchange identifier"
+    },
+    {
+      "name": "timeInForce",
+      "type": {
+        "type": "enum",
+        "name": "TimeInForce",
+        "symbols": ["GTC", "IOC", "FOK", "DAY"]
+      },
+      "default": "GTC",
+      "doc": "Time in force"
+    },
+    {
+      "name": "allocations",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "Allocation",
+          "doc": "Represents a fill execution allocated to this order",
+          "fields": [
+            {
+              "name": "allocationId",
+              "type": "long",
+              "doc": "Unique allocation identifier"
+            },
+            {
+              "name": "executionId",
+              "type": "long",
+              "doc": "Execution ID from matching engine"
+            },
+            {
+              "name": "fillPrice",
+              "type": "long",
+              "doc": "Price at which this allocation was executed"
+            },
+            {
+              "name": "fillQuantity",
+              "type": "long",
+              "doc": "Quantity filled in this allocation"
+            },
+            {
+              "name": "fillTimestamp",
+              "type": "long",
+              "doc": "Timestamp when this allocation occurred (nanoseconds)"
+            },
+            {
+              "name": "venue",
+              "type": "string",
+              "doc": "Venue/exchange where execution occurred"
+            },
+            {
+              "name": "counterpartyOrderId",
+              "type": "long",
+              "doc": "Order ID of the counterparty (for audit)"
+            }
+          ]
+        }
+      },
+      "default": [],
+      "doc": "List of allocations (fills) for this order"
+    }
+  ]
+}
