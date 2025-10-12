@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OrderEvent",
+  "description": "Event representing a state change in an order's lifecycle",
+  "type": "object",
+  "required": [
+    "eventId",
+    "internalOrderId",
+    "clientOrderId",
+    "eventType",
+    "previousState",
+    "newState",
+    "timestamp"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "integer",
+      "description": "Unique event identifier",
+      "minimum": 1,
+      "format": "int64"
+    },
+    "internalOrderId": {
+      "type": "integer",
+      "description": "Internal order identifier",
+      "minimum": 1,
+      "format": "int64"
+    },
+    "clientOrderId": {
+      "type": "string",
+      "description": "Client order identifier",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "eventType": {
+      "type": "string",
+      "description": "Type of order event",
+      "enum": [
+        "ORDER_RECEIVED",
+        "ORDER_ACCEPTED",
+        "ORDER_REJECTED",
+        "ORDER_WORKING",
+        "ORDER_PARTIAL_FILL",
+        "ORDER_FILLED",
+        "ORDER_CANCELLED",
+        "ORDER_EXPIRED"
+      ]
+    },
+    "previousState": {
+      "type": "string",
+      "description": "State before this event",
+      "enum": [
+        "NEW",
+        "ACCEPTED",
+        "WORKING",
+        "PARTIAL_FILL",
+        "FILLED",
+        "CANCELLED",
+        "REJECTED",
+        "EXPIRED"
+      ]
+    },
+    "newState": {
+      "type": "string",
+      "description": "State after this event",
+      "enum": [
+        "NEW",
+        "ACCEPTED",
+        "WORKING",
+        "PARTIAL_FILL",
+        "FILLED",
+        "CANCELLED",
+        "REJECTED",
+        "EXPIRED"
+      ]
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Event timestamp in nanoseconds",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional reason for the state change (e.g., rejection reason)",
+      "maxLength": 256
+    },
+    "fillQuantity": {
+      "type": "integer",
+      "description": "Quantity filled (for fill events)",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "fillPrice": {
+      "type": "integer",
+      "description": "Price of fill (for fill events)",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "executionId": {
+      "type": "integer",
+      "description": "Execution ID (for fill events)",
+      "minimum": 0,
+      "format": "int64"
+    }
+  }
+}

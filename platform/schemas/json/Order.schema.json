@@ -1,0 +1,191 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Order",
+  "description": "Complete order representation with state information for the OMS",
+  "type": "object",
+  "required": [
+    "internalOrderId",
+    "clientOrderId",
+    "symbol",
+    "side",
+    "orderType",
+    "quantity",
+    "price",
+    "state",
+    "timestamp",
+    "account",
+    "venue"
+  ],
+  "properties": {
+    "internalOrderId": {
+      "type": "integer",
+      "description": "System-assigned unique order identifier",
+      "minimum": 1,
+      "format": "int64"
+    },
+    "clientOrderId": {
+      "type": "string",
+      "description": "Client-assigned unique order identifier",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "symbol": {
+      "type": "string",
+      "description": "Trading symbol/instrument",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "side": {
+      "type": "string",
+      "description": "Order side",
+      "enum": ["BUY", "SELL"]
+    },
+    "orderType": {
+      "type": "string",
+      "description": "Order type",
+      "enum": ["MARKET", "LIMIT", "STOP", "STOP_LIMIT"]
+    },
+    "quantity": {
+      "type": "integer",
+      "description": "Total order quantity (in lots or shares)",
+      "minimum": 1,
+      "format": "int64"
+    },
+    "filledQuantity": {
+      "type": "integer",
+      "description": "Quantity already filled",
+      "minimum": 0,
+      "format": "int64",
+      "default": 0
+    },
+    "remainingQuantity": {
+      "type": "integer",
+      "description": "Quantity remaining to be filled",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "price": {
+      "type": "integer",
+      "description": "Order price (in minimum price increments, e.g., cents or ticks)",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "averageFillPrice": {
+      "type": "integer",
+      "description": "Average fill price across all executions",
+      "minimum": 0,
+      "format": "int64",
+      "default": 0
+    },
+    "state": {
+      "type": "string",
+      "description": "Current order state",
+      "enum": [
+        "NEW",
+        "ACCEPTED",
+        "WORKING",
+        "PARTIAL_FILL",
+        "FILLED",
+        "CANCELLED",
+        "REJECTED",
+        "EXPIRED"
+      ]
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "Order creation timestamp in nanoseconds",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "lastUpdateTimestamp": {
+      "type": "integer",
+      "description": "Last state update timestamp in nanoseconds",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "account": {
+      "type": "integer",
+      "description": "Trading account identifier",
+      "minimum": 0,
+      "format": "int64"
+    },
+    "venue": {
+      "type": "string",
+      "description": "Trading venue/exchange identifier",
+      "minLength": 1,
+      "maxLength": 16
+    },
+    "timeInForce": {
+      "type": "string",
+      "description": "Time in force",
+      "enum": ["GTC", "IOC", "FOK", "DAY"],
+      "default": "GTC"
+    },
+    "allocations": {
+      "type": "array",
+      "description": "List of allocations (fills) for this order",
+      "items": {
+        "$ref": "#/definitions/Allocation"
+      },
+      "default": []
+    }
+  },
+  "definitions": {
+    "Allocation": {
+      "type": "object",
+      "required": [
+        "allocationId",
+        "executionId",
+        "fillPrice",
+        "fillQuantity",
+        "fillTimestamp",
+        "venue"
+      ],
+      "properties": {
+        "allocationId": {
+          "type": "integer",
+          "description": "Unique allocation identifier",
+          "minimum": 1,
+          "format": "int64"
+        },
+        "executionId": {
+          "type": "integer",
+          "description": "Execution ID from matching engine",
+          "minimum": 1,
+          "format": "int64"
+        },
+        "fillPrice": {
+          "type": "integer",
+          "description": "Price at which this allocation was executed",
+          "minimum": 0,
+          "format": "int64"
+        },
+        "fillQuantity": {
+          "type": "integer",
+          "description": "Quantity filled in this allocation",
+          "minimum": 1,
+          "format": "int64"
+        },
+        "fillTimestamp": {
+          "type": "integer",
+          "description": "Timestamp when this allocation occurred (nanoseconds)",
+          "minimum": 0,
+          "format": "int64"
+        },
+        "venue": {
+          "type": "string",
+          "description": "Venue/exchange where execution occurred",
+          "minLength": 1,
+          "maxLength": 16
+        },
+        "counterpartyOrderId": {
+          "type": "integer",
+          "description": "Order ID of the counterparty (for audit)",
+          "minimum": 0,
+          "format": "int64"
+        }
+      }
+    }
+  }
+}

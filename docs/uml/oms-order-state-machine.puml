@@ -1,0 +1,168 @@
+@startuml OMS Order State Machine
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam state {
+    BackgroundColor<<terminal>> #FFE6E6
+    BackgroundColor<<active>> #E6F3FF
+    BackgroundColor<<initial>> #F0F0F0
+    BorderColor #333333
+}
+
+title Order Management System - Order State Machine
+note top
+  **Deterministic Order Lifecycle State Machine**
+  
+  This state machine defines all valid transitions for orders in the OMS.
+  Each state represents a distinct phase in the order's lifecycle.
+  
+  **State Categories:**
+  • Initial: NEW (gray)
+  • Active: ACCEPTED, WORKING, PARTIAL_FILL (blue)
+  • Terminal: FILLED, CANCELLED, REJECTED, EXPIRED (red)
+  
+  **Key Properties:**
+  • Deterministic: Same input → same output
+  • Idempotent: Duplicate transitions to current state are safe
+  • Immutable: Terminal states cannot transition to other states
+end note
+
+state "NEW" as NEW <<initial>>
+state "ACCEPTED" as ACCEPTED <<active>>
+state "WORKING" as WORKING <<active>>
+state "PARTIAL_FILL" as PARTIAL_FILL <<active>>
+state "FILLED" as FILLED <<terminal>>
+state "CANCELLED" as CANCELLED <<terminal>>
+state "REJECTED" as REJECTED <<terminal>>
+state "EXPIRED" as EXPIRED <<terminal>>
+
+[*] --> NEW : Order received
+
+' Valid transitions from NEW
+NEW --> ACCEPTED : Order validated\nRisk checks passed
+NEW --> REJECTED : Validation failed\nRisk checks failed
+
+' Valid transitions from ACCEPTED
+ACCEPTED --> WORKING : Routed to venue\nEntered order book
+ACCEPTED --> REJECTED : Venue rejected order
+ACCEPTED --> CANCELLED : Cancelled before routing
+
+' Valid transitions from WORKING
+WORKING --> PARTIAL_FILL : First partial fill
+WORKING --> FILLED : Fully filled\n(single execution)
+WORKING --> CANCELLED : User cancellation\nSystem cancellation
+WORKING --> EXPIRED : Time-in-force expiry\n(DAY, GTD orders)
+
+' Valid transitions from PARTIAL_FILL
+PARTIAL_FILL --> PARTIAL_FILL : Subsequent partial fills\n(idempotent)
+PARTIAL_FILL --> FILLED : Final fill\nOrder complete
+PARTIAL_FILL --> CANCELLED : User cancellation\nof partial fill
+PARTIAL_FILL --> EXPIRED : Time-in-force expiry\nwith partial fill
+
+' Terminal states
+FILLED --> [*]
+CANCELLED --> [*]
+REJECTED --> [*]
+EXPIRED --> [*]
+
+note right of NEW
+  **Initial State**
+  Order received but not
+  yet validated or accepted.
+  
+  Next states:
+  • ACCEPTED (happy path)
+  • REJECTED (validation fails)
+end note
+
+note right of ACCEPTED
+  **Pre-Routing State**
+  Order validated and accepted.
+  Passed pre-trade risk checks.
+  Pending routing to venue.
+  
+  Next states:
+  • WORKING (routed successfully)
+  • REJECTED (venue rejects)
+  • CANCELLED (cancelled pre-routing)
+end note
+
+note right of WORKING
+  **Active in Order Book**
+  Order active on venue.
+  Available for matching.
+  
+  Next states:
+  • PARTIAL_FILL (first fill)
+  • FILLED (complete fill)
+  • CANCELLED (user cancel)
+  • EXPIRED (time expiry)
+end note
+
+note right of PARTIAL_FILL
+  **Partially Executed**
+  At least one fill occurred.
+  Remaining quantity working.
+  
+  Next states:
+  • PARTIAL_FILL (more fills)
+  • FILLED (final fill)
+  • CANCELLED (user cancel)
+  • EXPIRED (time expiry)
+end note
+
+note bottom of FILLED
+  **Terminal: Fully Filled**
+  All quantity executed.
+  No further transitions.
+end note
+
+note bottom of CANCELLED
+  **Terminal: Cancelled**
+  Order removed from book.
+  May be partially filled.
+  No further transitions.
+end note
+
+note bottom of REJECTED
+  **Terminal: Rejected**
+  Order rejected by OMS or venue.
+  Never entered order book.
+  No further transitions.
+end note
+
+note bottom of EXPIRED
+  **Terminal: Expired**
+  Order expired per TIF rules.
+  May be partially filled.
+  No further transitions.
+end note
+
+legend right
+  **Invalid Transitions (Examples)**
+  These transitions are explicitly rejected:
+  
+  • NEW → WORKING (must go through ACCEPTED)
+  • NEW → FILLED (must be accepted and working first)
+  • NEW → PARTIAL_FILL (must be working first)
+  • NEW → CANCELLED (use REJECTED for early rejection)
+  • NEW → EXPIRED (use REJECTED for early expiry)
+  • ACCEPTED → FILLED (must be working first)
+  • ACCEPTED → PARTIAL_FILL (must be working first)
+  • ACCEPTED → EXPIRED (use CANCELLED or REJECTED)
+  • WORKING → REJECTED (already accepted, use CANCELLED)
+  • From any TERMINAL state (cannot transition)
+  
+  **Idempotency**
+  Transitioning to the current state is allowed and is a no-op.
+  This ensures duplicate events (retries, network issues) are safe.
+  
+  **State Machine Guarantees**
+  • **Deterministic**: Same sequence of events produces same final state
+  • **Auditable**: All transitions are logged with timestamps
+  • **Thread-safe**: Concurrent access is safe
+  • **Replay-safe**: Event replay produces identical state
+endlegend
+
+@enduml

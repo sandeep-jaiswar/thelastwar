@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package com.thelastwar.oms;
+
+option java_package = "com.thelastwar.oms";
+option java_outer_classname = "OrderEventProto";
+option java_multiple_files = true;
+
+// Event representing a state change in an order's lifecycle
+message OrderEvent {
+  // Unique event identifier
+  int64 event_id = 1;
+  
+  // Internal order identifier
+  int64 internal_order_id = 2;
+  
+  // Client order identifier
+  string client_order_id = 3;
+  
+  // Type of order event
+  enum EventType {
+    EVENT_TYPE_UNSPECIFIED = 0;
+    ORDER_RECEIVED = 1;
+    ORDER_ACCEPTED = 2;
+    ORDER_REJECTED = 3;
+    ORDER_WORKING = 4;
+    ORDER_PARTIAL_FILL = 5;
+    ORDER_FILLED = 6;
+    ORDER_CANCELLED = 7;
+    ORDER_EXPIRED = 8;
+  }
+  EventType event_type = 4;
+  
+  // State before this event
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    NEW = 1;
+    ACCEPTED = 2;
+    WORKING = 3;
+    PARTIAL_FILL = 4;
+    FILLED = 5;
+    CANCELLED = 6;
+    REJECTED = 7;
+    EXPIRED = 8;
+  }
+  State previous_state = 5;
+  
+  // State after this event
+  State new_state = 6;
+  
+  // Event timestamp in nanoseconds
+  int64 timestamp = 7;
+  
+  // Optional reason for the state change (e.g., rejection reason)
+  string reason = 8;
+  
+  // Quantity filled (for fill events)
+  int64 fill_quantity = 9;
+  
+  // Price of fill (for fill events)
+  int64 fill_price = 10;
+  
+  // Execution ID (for fill events)
+  int64 execution_id = 11;
+}
