@@ -73,7 +73,7 @@
           "conditions": [
             {
               "evaluator": {
-                "params": [15000],
+                "params": ["$latency_threshold"],
                 "type": "gt"
               },
               "query": {
@@ -84,7 +84,7 @@
           "executionErrorState": "alerting",
           "for": "1m",
           "frequency": "1m",
-          "message": "Matching engine p99 latency exceeds 15 µs threshold"
+          "message": "Matching engine p99 latency exceeds threshold"
         }
       },
       {
@@ -123,7 +123,7 @@
         },
         "targets": [
           {
-            "expr": "rate(matching_orders_rejected_total[1m]) / rate(matching_orders_processed_total[1m])",
+            "expr": "rate(matching_orders_rejected_total[1m]) / (rate(matching_orders_processed_total[1m]) + 0.001)",
             "legendFormat": "{{engine}}",
             "refId": "A"
           }
@@ -331,6 +331,16 @@
           "refresh": 1,
           "includeAll": true,
           "multi": true
+        },
+        {
+          "name": "latency_threshold",
+          "label": "Latency Threshold (ns)",
+          "type": "custom",
+          "query": "10000,15000,20000,25000,30000",
+          "current": {
+            "value": "15000",
+            "text": "15000"
+          }
         }
       ]
     }
