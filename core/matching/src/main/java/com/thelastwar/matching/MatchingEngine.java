@@ -40,6 +40,7 @@ public class MatchingEngine implements IMatchingEngine {
     private volatile boolean running;
     private final RiskValidator riskValidator;
     private final ExecutionPublisher executionPublisher; // Optional external publisher
+    private final MatchingEngineMetricsCollector metricsCollector; // Metrics collector
     
     /**
      * Creates a new matching engine with default risk validation.
@@ -68,6 +69,18 @@ public class MatchingEngine implements IMatchingEngine {
      * @param executionPublisher  Optional external publisher for downstream systems (can be null)
      */
     public MatchingEngine(EventBus eventBus, RiskValidator riskValidator, ExecutionPublisher executionPublisher) {
+        this(eventBus, riskValidator, executionPublisher, new MatchingEngineMetricsCollector("default"));
+    }
+    
+    /**
+     * Creates a new matching engine with custom risk validation, execution publisher, and metrics.
+     * 
+     * @param eventBus            Event bus for publishing/subscribing events
+     * @param riskValidator       Risk validator for pre-trade checks
+     * @param executionPublisher  Optional external publisher for downstream systems (can be null)
+     * @param metricsCollector    Metrics collector for tracking performance
+     */
+    public MatchingEngine(EventBus eventBus, RiskValidator riskValidator, ExecutionPublisher executionPublisher, MatchingEngineMetricsCollector metricsCollector) {
         this.eventBus = eventBus;
         this.books = new ConcurrentHashMap<>();
         this.executionIdCounter = new AtomicLong(0);
@@ -76,6 +89,7 @@ public class MatchingEngine implements IMatchingEngine {
         this.running = false;
         this.riskValidator = riskValidator;
         this.executionPublisher = executionPublisher;
+        this.metricsCollector = metricsCollector;
     }
     
     /**
@@ -186,6 +200,9 @@ public class MatchingEngine implements IMatchingEngine {
         long executionId = executionIdCounter.incrementAndGet();
         long timestamp = System.nanoTime();
         
+        // Record rejection in metrics
+        metricsCollector.recordOrderRejected();
+        
         // Create rejection execution
         ExecutionEvent rejection = ExecutionEvent.reject(executionId, orderEvent, reasonCode);
         
@@ -213,6 +230,9 @@ public class MatchingEngine implements IMatchingEngine {
      * @param timestamp Event timestamp
      */
     private void processOrder(OrderEvent orderEvent, long timestamp) {
+        // Track start time for latency measurement
+        long startNanos = System.nanoTime();
+        
         LimitOrderBook book = getOrderBook(orderEvent.symbol());
         
         // Convert OrderEvent to Order for the book
@@ -233,12 +253,22 @@ public class MatchingEngine implements IMatchingEngine {
             if (availableLiquidity < order.quantity()) {
                 // FOK order cannot be fully filled - reject entire order
                 cancelOrder(orderEvent, "FOK order cannot be fully filled");
+                // Record latency and return
+                long latencyNanos = System.nanoTime() - startNanos;
+                metricsCollector.recordMatchLatency(latencyNanos);
                 return;
             }
         }
         
         // Attempt to match the order
         long remainingQuantity = matchOrder(book, order, orderEvent);
+        
+        // Record order processed
+        metricsCollector.recordOrderProcessed();
+        
+        // Record latency
+        long latencyNanos = System.nanoTime() - startNanos;
+        metricsCollector.recordMatchLatency(latencyNanos);
         
         // Handle IOC orders - cancel any unfilled portion
         if (orderEvent.isIOC() && remainingQuantity > 0) {
@@ -460,6 +490,9 @@ public class MatchingEngine implements IMatchingEngine {
         long executionId = executionIdCounter.incrementAndGet();
         long timestamp = System.nanoTime();
         
+        // Record trade generated
+        metricsCollector.recordTradeGenerated();
+        
         // Create trade event
         TradeEvent trade = new TradeEvent(
             tradeId,
@@ -569,6 +602,15 @@ public class MatchingEngine implements IMatchingEngine {
             tradeIdCounter.get(),
             sequenceTracker.get()
         );
+    }
+    
+    /**
+     * Gets the real-time metrics collector for performance monitoring.
+     * 
+     * @return MatchingEngineMetricsCollector instance
+     */
+    public MatchingEngineMetricsCollector getMetricsCollector() {
+        return metricsCollector;
     }
     
     /**
@@ -700,6 +742,9 @@ public class MatchingEngine implements IMatchingEngine {
             return;
         }
         
+        // Track start time for latency measurement
+        long startNanos = System.nanoTime();
+        
         // Track sequence for deterministic replay
         long sequence = sequenceTracker.incrementAndGet();
         
@@ -707,6 +752,9 @@ public class MatchingEngine implements IMatchingEngine {
         if (book == null) {
             // Symbol not found - publish rejection
             publishCancelRejection(cancel, "Symbol not found");
+            // Record latency
+            long latencyNanos = System.nanoTime() - startNanos;
+            metricsCollector.recordCancelLatency(latencyNanos);
             return;
         }
         
@@ -715,8 +763,18 @@ public class MatchingEngine implements IMatchingEngine {
         if (removed == null) {
             // Order not found - publish rejection
             publishCancelRejection(cancel, "Order not found");
+            // Record latency
+            long latencyNanos = System.nanoTime() - startNanos;
+            metricsCollector.recordCancelLatency(latencyNanos);
             return;
         }
+        
+        // Record cancellation
+        metricsCollector.recordOrderCancelled();
+        
+        // Record latency
+        long latencyNanos = System.nanoTime() - startNanos;
+        metricsCollector.recordCancelLatency(latencyNanos);
         
         // Publish cancellation execution event
         publishCancellationExecution(cancel, removed);
@@ -733,6 +791,9 @@ public class MatchingEngine implements IMatchingEngine {
             return;
         }
         
+        // Track start time for latency measurement
+        long startNanos = System.nanoTime();
+        
         // Track sequence for deterministic replay
         long sequence = sequenceTracker.incrementAndGet();
         
@@ -740,6 +801,9 @@ public class MatchingEngine implements IMatchingEngine {
         if (book == null) {
             // Symbol not found - publish rejection
             publishModifyRejection(modify, "Symbol not found");
+            // Record latency
+            long latencyNanos = System.nanoTime() - startNanos;
+            metricsCollector.recordModifyLatency(latencyNanos);
             return;
         }
         
@@ -748,6 +812,9 @@ public class MatchingEngine implements IMatchingEngine {
         if (existingOrder == null) {
             // Order not found - publish rejection
             publishModifyRejection(modify, "Order not found");
+            // Record latency
+            long latencyNanos = System.nanoTime() - startNanos;
+            metricsCollector.recordModifyLatency(latencyNanos);
             return;
         }
         
@@ -783,6 +850,13 @@ public class MatchingEngine implements IMatchingEngine {
         
         // Try to match the modified order
         long remainingQuantity = matchOrder(book, modifiedOrder, modifiedOrderEvent);
+        
+        // Record modification
+        metricsCollector.recordOrderModified();
+        
+        // Record latency
+        long latencyNanos = System.nanoTime() - startNanos;
+        metricsCollector.recordModifyLatency(latencyNanos);
         
         // If order has remaining quantity, add back to book
         if (remainingQuantity > 0) {
