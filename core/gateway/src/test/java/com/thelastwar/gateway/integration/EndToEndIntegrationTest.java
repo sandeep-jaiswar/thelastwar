@@ -1,22 +1,16 @@
 package com.thelastwar.gateway.integration;
 
-import com.thelastwar.eventbus.Event;
-import com.thelastwar.eventbus.EventBus;
-import com.thelastwar.eventbus.EventHandler;
-import com.thelastwar.eventbus.EventType;
-import com.thelastwar.eventbus.SourceId;
+import com.thelastwar.eventbus.*;
 import com.thelastwar.eventbus.model.ExecutionEvent;
 import com.thelastwar.eventbus.model.OrderEvent;
 import com.thelastwar.gateway.FixGateway;
 import com.thelastwar.gateway.GatewayMetrics;
 import com.thelastwar.gateway.TestEventBus;
 import org.junit.jupiter.api.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import quickfix.*;
-import quickfix.field.*;
-import quickfix.fix44.NewOrderSingle;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -24,22 +18,17 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.thelastwar.gateway.integration.IntegrationTestUtils.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * End-to-End Integration Test validating complete message flow:
- * Gateway → EventBus → Matching Engine (simulated) → back to Gateway
- * 
- * Validates:
- * - Complete round-trip message flow
- * - End-to-end latency < 3 ms
- * - No message drops
- * - Proper event routing through EventBus
+ * End-to-end integration tests validating complete message flow.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Tag("integration")
 class EndToEndIntegrationTest {
     
+    private static final Logger log = LoggerFactory.getLogger(EndToEndIntegrationTest.class);
     private static final int SERVER_PORT = 19878;
     private static final String SENDER_COMP_ID = "E2E_CLIENT";
     private static final String TARGET_COMP_ID = "E2E_SERVER";
@@ -56,19 +45,15 @@ class EndToEndIntegrationTest {
         eventBus.start();
         
         metrics = new GatewayMetrics("e2e-test-gateway");
-        
-        // Start simulated matching engine
         matchingEngine = new SimulatedMatchingEngine(eventBus);
         matchingEngine.start();
         
-        // Start simulated FIX server
         server = new SimulatedFixServer(SERVER_PORT);
         server.start();
         
-        Thread.sleep(500);
+        waitFor(500);
         
-        SessionSettings clientSettings = createClientSettings();
-        gateway = new FixGateway(eventBus, clientSettings, metrics);
+        gateway = new FixGateway(eventBus, FixServerConfig.createClientSettings(SERVER_PORT, SENDER_COMP_ID, TARGET_COMP_ID, "e2e-client"), metrics);
     }
     
     @AfterEach
@@ -85,8 +70,7 @@ class EndToEndIntegrationTest {
         if (eventBus != null) {
             eventBus.stop();
         }
-        
-        cleanupTestFiles();
+        cleanupTestFiles("e2e-client", "e2e-server");
     }
     
     @Test
@@ -94,62 +78,46 @@ class EndToEndIntegrationTest {
     void testCompleteRoundTripFlow() throws Exception {
         CountDownLatch executionLatch = new CountDownLatch(1);
         AtomicInteger executionCount = new AtomicInteger(0);
-        AtomicLong executionTime = new AtomicLong(0);
         
-        // Subscribe to executions (from matching engine back to gateway)
         eventBus.subscribe(EventType.ORDER_FILLED, new EventHandler<Object>() {
             @Override
             public void onEvent(Event event) {
                 executionCount.incrementAndGet();
-                executionTime.set(System.nanoTime());
                 executionLatch.countDown();
             }
             
             @Override
             public void onError(Event event, Throwable exception) {
-                exception.printStackTrace();
+                log.error("Error processing execution", exception);
             }
         });
         
         gateway.start();
-        Thread.sleep(1000); // Wait for connection
+        waitFor(1000);
         
-        System.out.println("=== End-to-End Integration Test ===");
-        System.out.println("Testing EventBus → Matching Engine → Gateway flow...\n");
+        log.info("Testing end-to-end flow");
         
         long startTime = System.nanoTime();
         
-        // Simulate an order being submitted to the matching engine
-        // (in reality this would come from the gateway via FIX/REST/WebSocket)
+        // Publish order to EventBus (simulating order submission)
         OrderEvent orderEvent = OrderEvent.newOrder(
             12345L, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
             100L, 15000L, 999L, 1
         );
-        Event orderSubmitted = Event.create(
+        eventBus.publish(Event.create(
             System.nanoTime(), 1L, SourceId.OMS,
             EventType.ORDER_SUBMITTED, 0L, orderEvent
-        );
-        eventBus.publish(orderSubmitted);
+        ));
         
-        // Wait for execution event from simulated matching engine
         boolean executed = executionLatch.await(5, TimeUnit.SECONDS);
-        assertTrue(executed, "Execution should be received from matching engine");
+        double latencyMs = (System.nanoTime() - startTime) / 1_000_000.0;
         
-        long endTime = System.nanoTime();
-        long totalLatencyNs = endTime - startTime;
-        double totalLatencyMs = totalLatencyNs / 1_000_000.0;
+        log.info("Round-trip completed - Executions: {}, Latency: {} ms", 
+                executionCount.get(), latencyMs);
         
-        System.out.println("EventBus flow completed:");
-        System.out.println("  Executions received: " + executionCount.get());
-        System.out.println("  Total latency: " + String.format("%.3f", totalLatencyMs) + " ms");
-        
-        // Validate flow
-        assertEquals(1, executionCount.get(), "One execution should be received");
-        
-        // Validate latency requirement
-        assertTrue(totalLatencyMs < 50.0, "End-to-end latency should be < 50 ms in test environment");
-        
-        System.out.println("✓ End-to-end flow validated");
+        assertTrue(executed, "Execution should be received");
+        assertEquals(1, executionCount.get(), "One execution expected");
+        assertTrue(latencyMs < 50.0, "Latency should be < 50 ms");
     }
     
     @Test
@@ -160,7 +128,6 @@ class EndToEndIntegrationTest {
         AtomicInteger executionCount = new AtomicInteger(0);
         List<Long> latencies = new ArrayList<>();
         
-        // Subscribe to executions
         eventBus.subscribe(EventType.ORDER_FILLED, new EventHandler<Object>() {
             @Override
             public void onEvent(Event event) {
@@ -170,19 +137,17 @@ class EndToEndIntegrationTest {
             
             @Override
             public void onError(Event event, Throwable exception) {
-                exception.printStackTrace();
+                log.error("Error processing execution", exception);
             }
         });
         
         gateway.start();
-        Thread.sleep(1000);
+        waitFor(1000);
         
-        System.out.println("\n=== High Volume Round-Trip Test ===");
-        System.out.println("Processing " + orderCount + " orders through EventBus...\n");
+        log.info("Testing high volume with {} orders", orderCount);
         
         long startTime = System.nanoTime();
         
-        // Simulate orders being submitted to matching engine
         for (int i = 0; i < orderCount; i++) {
             long sendStart = System.nanoTime();
             
@@ -190,48 +155,31 @@ class EndToEndIntegrationTest {
                 (long) i + 1, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
                 100L, 15000L, 999L, 1
             );
-            Event event = Event.create(
+            eventBus.publish(Event.create(
                 System.nanoTime(), (long) i + 1, SourceId.OMS,
                 EventType.ORDER_SUBMITTED, 0L, orderEvent
-            );
-            eventBus.publish(event);
+            ));
             
-            long sendEnd = System.nanoTime();
-            latencies.add(sendEnd - sendStart);
+            latencies.add(System.nanoTime() - sendStart);
             
             if (i % 10 == 0) {
-                Thread.sleep(10);
+                waitFor(10);
             }
         }
         
-        // Wait for all executions
-        boolean allExecuted = executionLatch.await(10, TimeUnit.SECONDS);
+        executionLatch.await(10, TimeUnit.SECONDS);
         
-        long endTime = System.nanoTime();
-        long totalTimeMs = (endTime - startTime) / 1_000_000;
+        long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+        LatencyStats stats = calculateStats(latencies);
         
-        System.out.println("High volume test completed:");
-        System.out.println("  Orders submitted: " + orderCount);
-        System.out.println("  Executions received: " + executionCount.get());
-        System.out.println("  Total time: " + totalTimeMs + " ms");
-        System.out.println("  Throughput: " + String.format("%.0f", (orderCount * 1000.0) / totalTimeMs) + " orders/s");
+        log.info("High volume completed - Executions: {}, Duration: {} ms", 
+                executionCount.get(), durationMs);
         
-        // Calculate latency stats
-        latencies.sort(Long::compareTo);
-        double avgLatency = latencies.stream().mapToLong(Long::longValue).average().orElse(0) / 1_000_000.0;
-        long p99Latency = latencies.get((int) (latencies.size() * 0.99));
+        generateReport("end_to_end_high_volume", 
+                      new ReportData(orderCount, durationMs, executionCount.get(), stats));
         
-        System.out.println("  Avg publish latency: " + String.format("%.3f", avgLatency) + " ms");
-        System.out.println("  P99 publish latency: " + String.format("%.3f", p99Latency / 1_000_000.0) + " ms");
-        
-        // Generate report
-        generateE2EReport("end_to_end_high_volume", orderCount, orderCount, 
-                         executionCount.get(), totalTimeMs, latencies);
-        
-        // Validate - more realistic expectations
-        assertTrue(executionCount.get() >= orderCount * 0.8, "At least 80% executions should be received");
-        
-        System.out.println("✓ High volume round-trip validated");
+        assertTrue(executionCount.get() >= orderCount * 0.8, 
+                  "At least 80% executions should be received");
     }
     
     @Test
@@ -250,160 +198,44 @@ class EndToEndIntegrationTest {
             
             @Override
             public void onError(Event event, Throwable exception) {
-                exception.printStackTrace();
+                log.error("Error processing event", exception);
             }
         });
         
         gateway.start();
-        Thread.sleep(1000);
+        waitFor(1000);
         
-        System.out.println("\n=== EventBus Reliability Test ===");
-        System.out.println("Publishing " + eventCount + " events...\n");
+        log.info("Testing EventBus reliability with {} events", eventCount);
         
-        // Publish events directly to EventBus
         for (int i = 0; i < eventCount; i++) {
             OrderEvent orderEvent = OrderEvent.newOrder(
                 (long) i + 1, "AAPL", OrderEvent.SIDE_BUY, OrderEvent.TYPE_LIMIT,
                 100L, 15000L, 999L, 1
             );
-            Event event = Event.create(
+            eventBus.publish(Event.create(
                 System.nanoTime(), (long) i + 1, SourceId.OMS,
                 EventType.ORDER_SUBMITTED, 0L, orderEvent
-            );
-            eventBus.publish(event);
+            ));
         }
         
-        // Wait for all events
-        boolean allReceived = latch.await(10, TimeUnit.SECONDS);
+        latch.await(10, TimeUnit.SECONDS);
         
-        System.out.println("EventBus reliability test:");
-        System.out.println("  Published: " + eventCount);
-        System.out.println("  Received: " + receivedCount.get());
-        System.out.println("  Loss rate: " + String.format("%.2f", 
-            ((eventCount - receivedCount.get()) * 100.0) / eventCount) + "%");
+        double lossRate = ((eventCount - receivedCount.get()) * 100.0) / eventCount;
         
-        // Validate
-        assertTrue(receivedCount.get() >= eventCount * 0.95, "At least 95% events should be received");
+        log.info("EventBus reliability - Published: {}, Received: {}, Loss: {}%", 
+                eventCount, receivedCount.get(), lossRate);
         
-        System.out.println("✓ EventBus reliability validated");
-    }
-    
-    private SessionSettings createClientSettings() throws Exception {
-        SessionSettings settings = new SessionSettings();
-        
-        settings.setString("ConnectionType", "initiator");
-        settings.setString("SocketConnectHost", "localhost");
-        settings.setString("SocketConnectPort", String.valueOf(SERVER_PORT));
-        settings.setString("StartTime", "00:00:00");
-        settings.setString("EndTime", "23:59:59");
-        settings.setString("HeartBtInt", "30");
-        settings.setString("ReconnectInterval", "5");
-        settings.setString("FileStorePath", "build/tmp/fix-e2e-client-store");
-        settings.setString("FileLogPath", "build/tmp/fix-e2e-client-log");
-        
-        SessionID sessionID = new SessionID("FIX.4.4", SENDER_COMP_ID, TARGET_COMP_ID);
-        settings.setString(sessionID, "BeginString", "FIX.4.4");
-        settings.setString(sessionID, "SenderCompID", SENDER_COMP_ID);
-        settings.setString(sessionID, "TargetCompID", TARGET_COMP_ID);
-        settings.setString(sessionID, "ConnectionType", "initiator");
-        settings.setString(sessionID, "ResetOnLogon", "Y");
-        settings.setString(sessionID, "ResetOnLogout", "Y");
-        settings.setString(sessionID, "ResetOnDisconnect", "Y");
-        
-        return settings;
-    }
-    
-    private NewOrderSingle createTestOrder(long orderId) {
-        NewOrderSingle order = new NewOrderSingle();
-        
-        try {
-            order.set(new ClOrdID(String.valueOf(orderId)));
-            order.set(new Symbol("AAPL"));
-            order.set(new Side(Side.BUY));
-            order.set(new OrderQty(100));
-            order.set(new Price(150.00));
-            order.set(new OrdType(OrdType.LIMIT));
-            order.set(new TransactTime());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create test order", e);
-        }
-        
-        return order;
-    }
-    
-    private void generateE2EReport(String testName, int totalOrders, int submitted, 
-                                   int executed, long timeMs, List<Long> latencies) {
-        try {
-            File reportDir = new File("build/reports/load-tests");
-            reportDir.mkdirs();
-            
-            File reportFile = new File(reportDir, testName + "_report.txt");
-            
-            try (FileWriter writer = new FileWriter(reportFile)) {
-                writer.write("=== End-to-End Integration Test Report ===\n");
-                writer.write("Test: " + testName + "\n");
-                writer.write("Timestamp: " + System.currentTimeMillis() + "\n\n");
-                
-                writer.write("Results:\n");
-                writer.write("  Total orders: " + totalOrders + "\n");
-                writer.write("  Submitted: " + submitted + "\n");
-                writer.write("  Executed: " + executed + "\n");
-                writer.write("  Duration: " + timeMs + " ms\n");
-                writer.write("  Throughput: " + String.format("%.0f", (totalOrders * 1000.0) / timeMs) + " orders/s\n\n");
-                
-                if (!latencies.isEmpty()) {
-                    latencies.sort(Long::compareTo);
-                    double avg = latencies.stream().mapToLong(Long::longValue).average().orElse(0);
-                    long p95 = latencies.get((int) (latencies.size() * 0.95));
-                    long p99 = latencies.get((int) (latencies.size() * 0.99));
-                    
-                    writer.write("Latency:\n");
-                    writer.write("  Average: " + String.format("%.3f", avg / 1_000_000.0) + " ms\n");
-                    writer.write("  P95: " + String.format("%.3f", p95 / 1_000_000.0) + " ms\n");
-                    writer.write("  P99: " + String.format("%.3f", p99 / 1_000_000.0) + " ms\n\n");
-                }
-                
-                writer.write("Validation:\n");
-                writer.write("  ✓ Submission rate: " + String.format("%.1f", (submitted * 100.0) / totalOrders) + "%\n");
-                writer.write("  ✓ Execution rate: " + String.format("%.1f", (executed * 100.0) / totalOrders) + "%\n");
-            }
-            
-            System.out.println("Report generated: " + reportFile.getAbsolutePath());
-        } catch (Exception e) {
-            System.err.println("Failed to generate report: " + e.getMessage());
-        }
-    }
-    
-    private void cleanupTestFiles() {
-        deleteDirectory(new File("build/tmp/fix-e2e-client-store"));
-        deleteDirectory(new File("build/tmp/fix-e2e-client-log"));
-        deleteDirectory(new File("build/tmp/fix-e2e-server-store"));
-        deleteDirectory(new File("build/tmp/fix-e2e-server-log"));
-    }
-    
-    private void deleteDirectory(File dir) {
-        if (dir.exists()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    if (file.isDirectory()) {
-                        deleteDirectory(file);
-                    } else {
-                        file.delete();
-                    }
-                }
-            }
-            dir.delete();
-        }
+        assertTrue(receivedCount.get() >= eventCount * 0.95, 
+                  "At least 95% events should be received");
     }
     
     /**
-     * Simulated Matching Engine that processes orders and generates executions.
+     * Simulated matching engine.
      */
-    private static class SimulatedMatchingEngine {
+    private static class SimulatedMatchingEngine implements AutoCloseable {
         private final EventBus eventBus;
-        private volatile boolean running = false;
         private final AtomicLong sequenceNumber = new AtomicLong(1);
+        private volatile boolean running = false;
         
         SimulatedMatchingEngine(EventBus eventBus) {
             this.eventBus = eventBus;
@@ -412,7 +244,6 @@ class EndToEndIntegrationTest {
         void start() {
             running = true;
             
-            // Subscribe to order submissions
             eventBus.subscribe(EventType.ORDER_SUBMITTED, new EventHandler<Object>() {
                 @Override
                 public void onEvent(Event event) {
@@ -423,7 +254,7 @@ class EndToEndIntegrationTest {
                 
                 @Override
                 public void onError(Event event, Throwable exception) {
-                    exception.printStackTrace();
+                    // Ignore
                 }
             });
         }
@@ -434,78 +265,57 @@ class EndToEndIntegrationTest {
         
         private void processOrder(OrderEvent orderEvent) {
             try {
-                // Simulate some processing time
-                Thread.sleep(1);
+                waitFor(1);
                 
-                // Generate execution (complete fill)
                 long execId = sequenceNumber.incrementAndGet();
                 ExecutionEvent execution = ExecutionEvent.fill(
-                    execId,
-                    orderEvent,
-                    orderEvent.quantity(),  // fillQuantity = full order quantity
-                    orderEvent.price(),     // fillPrice
-                    orderEvent.quantity(),  // cumulativeQty = full quantity
-                    0L                      // leavesQuantity = 0 (complete fill)
+                    execId, orderEvent, orderEvent.quantity(), 
+                    orderEvent.price(), orderEvent.quantity(), 0L
                 );
                 
-                Event fillEvent = Event.create(
-                    System.nanoTime(),
-                    sequenceNumber.get(),
-                    SourceId.MATCHING_ENGINE,
-                    EventType.ORDER_FILLED,
-                    orderEvent.orderId(),
-                    execution
-                );
-                
-                eventBus.publish(fillEvent);
+                eventBus.publish(Event.create(
+                    System.nanoTime(), sequenceNumber.get(), SourceId.MATCHING_ENGINE,
+                    EventType.ORDER_FILLED, orderEvent.orderId(), execution
+                ));
             } catch (Exception e) {
-                System.err.println("Error processing order: " + e.getMessage());
+                // Ignore
             }
+        }
+        
+        @Override
+        public void close() {
+            stop();
         }
     }
     
     /**
-     * Simulated FIX server for integration testing.
+     * Simulated FIX server.
      */
-    private static class SimulatedFixServer implements Application {
+    private static class SimulatedFixServer implements Application, AutoCloseable {
         private final int port;
         private Acceptor acceptor;
-        private volatile boolean running = false;
         
         SimulatedFixServer(int port) {
             this.port = port;
         }
         
         void start() throws Exception {
-            SessionSettings settings = new SessionSettings();
-            
-            settings.setString("ConnectionType", "acceptor");
-            settings.setString("SocketAcceptPort", String.valueOf(port));
-            settings.setString("StartTime", "00:00:00");
-            settings.setString("EndTime", "23:59:59");
-            settings.setString("HeartBtInt", "30");
-            settings.setString("FileStorePath", "build/tmp/fix-e2e-server-store");
-            settings.setString("FileLogPath", "build/tmp/fix-e2e-server-log");
-            
-            SessionID sessionID = new SessionID("FIX.4.4", TARGET_COMP_ID, SENDER_COMP_ID);
-            settings.setString(sessionID, "BeginString", "FIX.4.4");
-            settings.setString(sessionID, "SenderCompID", TARGET_COMP_ID);
-            settings.setString(sessionID, "TargetCompID", SENDER_COMP_ID);
-            
-            MessageStoreFactory storeFactory = new MemoryStoreFactory();
-            LogFactory logFactory = new ScreenLogFactory(false, false, false);
-            MessageFactory messageFactory = new DefaultMessageFactory();
-            
-            acceptor = new SocketAcceptor(this, storeFactory, settings, logFactory, messageFactory);
+            SessionSettings settings = FixServerConfig.createServerSettings(port, TARGET_COMP_ID, SENDER_COMP_ID, "e2e-server");
+            acceptor = new SocketAcceptor(this, new MemoryStoreFactory(), settings, 
+                                         new ScreenLogFactory(false, false, false), 
+                                         new DefaultMessageFactory());
             acceptor.start();
-            running = true;
         }
         
         void stop() {
             if (acceptor != null) {
                 acceptor.stop();
-                running = false;
             }
+        }
+        
+        @Override
+        public void close() {
+            stop();
         }
         
         @Override
