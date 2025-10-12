@@ -38,7 +38,7 @@ The ExecutionPublisher is a high-performance event publishing system designed to
 
 ### Performance Characteristics
 
-- **Ultra-Low Latency**: < 10 µs end-to-end event propagation
+- **Ultra-Low Latency**: < 10 microseconds (µs) end-to-end event propagation
 - **High Throughput**: > 1M msgs/sec sustained throughput
 - **Fast Serialization**: > 5M msgs/sec serialization speed using EventSerializer
 - **Zero Allocations**: GC-neutral design with thread-local buffers
@@ -284,7 +284,7 @@ int fragments = subscription.poll(handler, 1024); // Process more per poll
 
 For multicast deployments:
 - Ensure multicast is enabled on network switches
-- Use odd last octet for multicast addresses (Aeron requirement)
+- Use odd last octet for multicast group addresses (Aeron-specific requirement for data channels)
 - Monitor network buffers: `sysctl net.core.rmem_max`
 - Consider dedicated network interface for trading traffic
 
@@ -313,7 +313,7 @@ Run JMH performance benchmarks:
 
 Expected results:
 - Throughput: > 1M ops/sec
-- Latency: < 10 µs (p99)
+- Latency: < 10 microseconds (µs) at p99
 
 ## Troubleshooting
 
@@ -377,7 +377,9 @@ Events now go to both EventBus (for internal components) and ExecutionPublisher 
 
 ## References
 
+**Note**: Reference paths are relative to the repository root.
+
 - [Aeron Documentation](https://github.com/real-logic/aeron/wiki)
-- [EventSerializer API](../core/eventbus/src/main/java/com/thelastwar/eventbus/model/EventSerializer.java)
-- [ExecutionPublisher Interface](../core/eventbus/src/main/java/com/thelastwar/eventbus/ExecutionPublisher.java)
-- [Integration Example](../core/eventbus/src/test/java/com/thelastwar/eventbus/example/ExecutionPublisherIntegrationExample.java)
+- [EventSerializer API](core/eventbus/src/main/java/com/thelastwar/eventbus/model/EventSerializer.java)
+- [ExecutionPublisher Interface](core/eventbus/src/main/java/com/thelastwar/eventbus/ExecutionPublisher.java)
+- [Integration Example](core/eventbus/src/test/java/com/thelastwar/eventbus/example/ExecutionPublisherIntegrationExample.java)
