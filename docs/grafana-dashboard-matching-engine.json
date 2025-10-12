@@ -1,0 +1,338 @@
+{
+  "dashboard": {
+    "title": "Matching Engine Performance Dashboard",
+    "description": "Real-time monitoring of matching engine metrics",
+    "tags": ["matching-engine", "performance", "trading"],
+    "timezone": "browser",
+    "editable": true,
+    "graphTooltip": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Orders Processed per Second",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(matching_orders_processed_total[1m])",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Orders/sec",
+            "format": "ops"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Match Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "matching_latency_match{quantile=\"0.5\"}",
+            "legendFormat": "p50 - {{engine}}",
+            "refId": "A"
+          },
+          {
+            "expr": "matching_latency_match{quantile=\"0.95\"}",
+            "legendFormat": "p95 - {{engine}}",
+            "refId": "B"
+          },
+          {
+            "expr": "matching_latency_match{quantile=\"0.99\"}",
+            "legendFormat": "p99 - {{engine}}",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Latency (ns)",
+            "format": "ns"
+          }
+        ],
+        "alert": {
+          "name": "High p99 Latency",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [15000],
+                "type": "gt"
+              },
+              "query": {
+                "params": ["C", "1m", "now"]
+              }
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "1m",
+          "frequency": "1m",
+          "message": "Matching engine p99 latency exceeds 15 µs threshold"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Trades Generated per Second",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(matching_trades_generated_total[1m])",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Trades/sec",
+            "format": "ops"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Rejection Rate",
+        "type": "graph",
+        "gridPos": {
+          "x": 8,
+          "y": 8,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(matching_orders_rejected_total[1m]) / rate(matching_orders_processed_total[1m])",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Rejection Rate",
+            "format": "percentunit",
+            "max": 0.2
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Queue Depth",
+        "type": "graph",
+        "gridPos": {
+          "x": 16,
+          "y": 8,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "matching_queue_depth",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Queue Depth",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Cancellation Latency (p99)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 14,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "matching_latency_cancel{quantile=\"0.99\"}",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Latency (ns)",
+            "format": "ns"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Modification Latency (p99)",
+        "type": "graph",
+        "gridPos": {
+          "x": 8,
+          "y": 14,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "matching_latency_modify{quantile=\"0.99\"}",
+            "legendFormat": "{{engine}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Latency (ns)",
+            "format": "ns"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Order Operations Summary",
+        "type": "stat",
+        "gridPos": {
+          "x": 16,
+          "y": 14,
+          "w": 8,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "matching_orders_processed_total",
+            "legendFormat": "Processed",
+            "refId": "A"
+          },
+          {
+            "expr": "matching_orders_rejected_total",
+            "legendFormat": "Rejected",
+            "refId": "B"
+          },
+          {
+            "expr": "matching_orders_cancelled_total",
+            "legendFormat": "Cancelled",
+            "refId": "C"
+          },
+          {
+            "expr": "matching_orders_modified_total",
+            "legendFormat": "Modified",
+            "refId": "D"
+          }
+        ],
+        "options": {
+          "orientation": "vertical",
+          "textMode": "value_and_name",
+          "colorMode": "value",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 9,
+        "title": "Throughput vs Target (5M orders/sec)",
+        "type": "gauge",
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(matching_orders_processed_total[1m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "value": 0,
+                  "color": "red"
+                },
+                {
+                  "value": 4000000,
+                  "color": "yellow"
+                },
+                {
+                  "value": 5000000,
+                  "color": "green"
+                }
+              ]
+            },
+            "max": 6000000
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Latency Histogram",
+        "type": "heatmap",
+        "gridPos": {
+          "x": 12,
+          "y": 20,
+          "w": 12,
+          "h": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(matching_latency_match_bucket[1m])",
+            "format": "heatmap",
+            "legendFormat": "{{le}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "calculate": false,
+          "cellGap": 2,
+          "yAxis": {
+            "unit": "ns"
+          }
+        }
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 38,
+    "style": "dark",
+    "templating": {
+      "list": [
+        {
+          "name": "engine",
+          "label": "Engine",
+          "type": "query",
+          "query": "label_values(matching_orders_processed_total, engine)",
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    }
+  }
+}
