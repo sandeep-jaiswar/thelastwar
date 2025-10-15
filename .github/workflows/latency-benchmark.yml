@@ -4,13 +4,23 @@ on:
     branches: [ production ]
 
 jobs:
+  # Matrix strategy to run benchmarks in parallel for each module
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
       issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - eventbus
+          - gateway
+          - matching
+          - orderbook
+          - restgateway
     steps:
       - uses: actions/checkout@v4
       - name: Setup Java
@@ -18,14 +28,41 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
-      - name: Run JMH Benchmarks
-        run: ./gradlew jmh --no-daemon
-      - name: Upload benchmark results
+      - name: Run JMH Benchmarks for ${{ matrix.module }}
+        run: ./gradlew :core:${{ matrix.module }}:jmh --no-daemon
+      - name: Upload benchmark results for ${{ matrix.module }}
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results
+          name: benchmark-results-${{ matrix.module }}
           path: |
-            **/build/reports/benchmarks
-            **/jmh-result.json
+            core/${{ matrix.module }}/build/reports/benchmarks
+            core/${{ matrix.module }}/jmh-result.json
+  
+  # Aggregate results from all modules
+  aggregate-results:
+    runs-on: ubuntu-latest
+    needs: benchmark
+    if: always()
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Download all benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: benchmark-results
+      - name: Display benchmark summary
+        run: |
+          echo "## Benchmark Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Benchmark results from all modules:" >> $GITHUB_STEP_SUMMARY
+          for module in eventbus gateway matching orderbook restgateway; do
+            if [ -d "benchmark-results/benchmark-results-$module" ]; then
+              echo "- ✅ $module: Completed" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ❌ $module: Failed or incomplete" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
 
