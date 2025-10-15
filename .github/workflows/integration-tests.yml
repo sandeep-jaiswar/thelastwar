@@ -2,9 +2,9 @@ name: Integration Test Harness
 
 on:
   pull_request:
-    branches: [ production, main ]
+    branches: [ production ]
   push:
-    branches: [ production, main ]
+    branches: [ production ]
 
 jobs:
   integration-tests:
@@ -119,40 +119,6 @@ jobs:
             **/build/reports/load-tests/*.txt
             build/reports/integration-summary/summary.txt
           retention-days: 30
-      
-      - name: Comment PR with Results
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            
-            let comment = '## Integration Test Harness Results\n\n';
-            
-            // Try to read summary
-            try {
-              const summaryPath = 'build/reports/integration-summary/summary.txt';
-              if (fs.existsSync(summaryPath)) {
-                const summary = fs.readFileSync(summaryPath, 'utf8');
-                comment += '### Load Test Summary\n```\n' + summary + '\n```\n\n';
-              }
-            } catch (error) {
-              console.log('Could not read summary:', error);
-            }
-            
-            comment += '### Acceptance Criteria\n';
-            comment += '- ✅ End-to-end latency < 3 ms for FIX orders\n';
-            comment += '- ✅ No message drops under sustained 10K msg/s\n';
-            comment += '- ✅ Reports auto-uploaded to CI artifacts\n';
-            comment += '- ✅ Green tests required for merge\n\n';
-            comment += '**[View detailed reports in artifacts](' + context.payload.pull_request.html_url + '/checks)**';
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
 
   quality-gate:
     runs-on: ubuntu-latest
