@@ -17,6 +17,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,8 +26,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,6 +44,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @Testcontainers
 class OMSPersistenceIntegrationTest {
+    
+    private static final Logger logger = LoggerFactory.getLogger(OMSPersistenceIntegrationTest.class);
     
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
@@ -130,8 +136,8 @@ class OMSPersistenceIntegrationTest {
         }
         eventPublisher.flush();
         
-        // Wait for Kafka to persist
-        Thread.sleep(1000);
+        // Wait for Kafka to persist with timeout
+        TimeUnit.SECONDS.sleep(2);
         
         // Step 3: Create snapshot
         SnapshotMetadata snapshot = snapshotManager.createSnapshot(
@@ -204,7 +210,7 @@ class OMSPersistenceIntegrationTest {
         long startSave = System.currentTimeMillis();
         orderStateStore.saveOrderStateBatch(orders.values());
         long saveDuration = System.currentTimeMillis() - startSave;
-        System.out.println("Saved " + orderCount + " orders in " + saveDuration + "ms");
+        logger.info("Saved {} orders in {}ms", orderCount, saveDuration);
         
         // Create snapshot
         long startSnapshot = System.currentTimeMillis();
@@ -212,13 +218,13 @@ class OMSPersistenceIntegrationTest {
             new TestSnapshotProvider(orders, 50000L)
         );
         long snapshotDuration = System.currentTimeMillis() - startSnapshot;
-        System.out.println("Created snapshot in " + snapshotDuration + "ms");
+        logger.info("Created snapshot in {}ms", snapshotDuration);
         
         // Restore snapshot
         long startRestore = System.currentTimeMillis();
         SnapshotData restored = snapshotManager.restoreSnapshot(snapshot.snapshotId());
         long restoreDuration = System.currentTimeMillis() - startRestore;
-        System.out.println("Restored snapshot in " + restoreDuration + "ms");
+        logger.info("Restored snapshot in {}ms", restoreDuration);
         
         assertEquals(orderCount, restored.orders().size());
         
@@ -230,9 +236,9 @@ class OMSPersistenceIntegrationTest {
         // Extrapolate to 1M orders
         double snapshotTimeFor1M = (snapshotDuration * 1000.0);
         double restoreTimeFor1M = (restoreDuration * 1000.0);
-        System.out.println("Extrapolated time for 1M orders:");
-        System.out.println("  Snapshot: " + (snapshotTimeFor1M / 1000.0) + "s");
-        System.out.println("  Restore: " + (restoreTimeFor1M / 1000.0) + "s");
+        logger.info("Extrapolated time for 1M orders:");
+        logger.info("  Snapshot: {}s", snapshotTimeFor1M / 1000.0);
+        logger.info("  Restore: {}s", restoreTimeFor1M / 1000.0);
     }
     
     @Test
