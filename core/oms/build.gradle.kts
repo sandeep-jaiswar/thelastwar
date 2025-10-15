@@ -20,6 +20,7 @@ dependencies {
     // Internal dependencies
     api(project(":core:eventbus"))
     api(project(":core:orderbook"))
+    api(project(":core:risk"))
 
     // PostgreSQL for persistence
     implementation("org.postgresql:postgresql:42.7.4")

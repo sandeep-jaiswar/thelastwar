@@ -5,6 +5,11 @@ import com.thelastwar.eventbus.EventBus;
 import com.thelastwar.eventbus.EventType;
 import com.thelastwar.eventbus.SourceId;
 import com.thelastwar.eventbus.model.OrderEvent;
+import com.thelastwar.risk.CompositeRiskValidator;
+import com.thelastwar.risk.CreditCheckModule;
+import com.thelastwar.risk.FatFingerCheckModule;
+import com.thelastwar.risk.MarginCheckModule;
+import com.thelastwar.risk.RiskValidator;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -33,6 +38,7 @@ public class OMSService implements AutoCloseable {
     
     private final EventBus eventBus;
     private final CommandLog commandLog;
+    private final RiskCheckService riskCheckService;
     private final AtomicLong internalOrderIdGenerator;
     private final AtomicLong commandIdGenerator;
     
@@ -46,8 +52,13 @@ public class OMSService implements AutoCloseable {
     private final Map<InternalOrderId, String> orderCorrelationIds;
     
     public OMSService(EventBus eventBus, Path commandLogPath) throws IOException {
+        this(eventBus, commandLogPath, createDefaultRiskCheckService());
+    }
+    
+    public OMSService(EventBus eventBus, Path commandLogPath, RiskCheckService riskCheckService) throws IOException {
         this.eventBus = eventBus;
         this.commandLog = new FileBasedCommandLog(commandLogPath);
+        this.riskCheckService = riskCheckService;
         this.internalOrderIdGenerator = new AtomicLong(1);
         this.commandIdGenerator = new AtomicLong(1);
         this.clientOrderIndex = new ConcurrentHashMap<>();
@@ -56,6 +67,18 @@ public class OMSService implements AutoCloseable {
         
         // Restore state from command log
         restoreFromCommandLog();
+    }
+    
+    /**
+     * Creates default risk check service with composite validator.
+     */
+    private static RiskCheckService createDefaultRiskCheckService() {
+        RiskValidator validator = new CompositeRiskValidator.Builder()
+            .add(new CreditCheckModule(10_000_000L, true))
+            .add(new MarginCheckModule(100_000L, true))
+            .add(new FatFingerCheckModule(100_000L, 1_000_000L, 100L, 100_000_000L, true))
+            .build();
+        return new RiskCheckService(validator, RiskCheckService.RiskCheckConfig.failClosed());
     }
     
     /**
@@ -138,6 +161,8 @@ public class OMSService implements AutoCloseable {
     public SubmissionResult submitOrder(String clientOrderId, String symbol, byte side, 
                                        byte orderType, long quantity, long price, 
                                        long account, String correlationId) {
+        long submissionStartNanos = System.nanoTime();
+        
         try {
             // Validate clientOrderId
             ClientOrderId coid = ClientOrderId.of(clientOrderId);
@@ -151,6 +176,31 @@ public class OMSService implements AutoCloseable {
             // Generate IDs
             long commandId = commandIdGenerator.getAndIncrement();
             InternalOrderId internalOrderId = InternalOrderId.of(internalOrderIdGenerator.getAndIncrement());
+            
+            // Create order event for risk check
+            OrderEvent orderEvent = OrderEvent.newOrder(
+                internalOrderId.value(), symbol, side, orderType, quantity, price, account, 1
+            );
+            
+            // *** PRE-TRADE RISK CHECK (SYNCHRONOUS) ***
+            RiskCheckService.RiskCheckResult riskResult = riskCheckService.check(orderEvent);
+            
+            // If risk check rejects the order, return rejection immediately
+            if (!riskResult.approved()) {
+                // Log risk rejection for audit
+                logRiskDecision(internalOrderId, orderEvent, riskResult, false);
+                
+                return SubmissionResult.riskRejection(
+                    internalOrderId.value(),
+                    riskResult.decision().message(),
+                    riskResult.decision().reasonCode(),
+                    correlationId,
+                    riskResult.latencyNanos()
+                );
+            }
+            
+            // Log risk approval for audit
+            logRiskDecision(internalOrderId, orderEvent, riskResult, true);
             
             // Create command
             OrderCommand command = OrderCommand.submit(
@@ -175,10 +225,6 @@ public class OMSService implements AutoCloseable {
             }
             
             // Create and publish order event
-            OrderEvent orderEvent = OrderEvent.newOrder(
-                internalOrderId.value(), symbol, side, orderType, quantity, price, account, 1
-            );
-            
             Event event = Event.now(
                 internalOrderId.value(),
                 SourceId.OMS,
@@ -195,8 +241,8 @@ public class OMSService implements AutoCloseable {
                 return SubmissionResult.error("Failed to publish order to EventBus", correlationId);
             }
             
-            // Total latency should be < 1-2ms
-            long totalLatency = System.nanoTime() - command.timestamp();
+            // Total latency should be < 10ms (including risk check)
+            long totalLatency = System.nanoTime() - submissionStartNanos;
             
             return SubmissionResult.success(internalOrderId.value(), correlationId, totalLatency);
             
@@ -205,6 +251,31 @@ public class OMSService implements AutoCloseable {
         } catch (IOException e) {
             return SubmissionResult.error("Failed to persist command: " + e.getMessage(), correlationId);
         }
+    }
+    
+    /**
+     * Logs risk decision for audit trail.
+     */
+    private void logRiskDecision(InternalOrderId orderId, OrderEvent orderEvent, 
+                                 RiskCheckService.RiskCheckResult riskResult, boolean approved) {
+        // Create audit log entry
+        String logMessage = String.format(
+            "[RISK_CHECK] OrderID=%d, Symbol=%s, Side=%d, Qty=%d, Price=%d, " +
+            "Decision=%s, ReasonCode=%d, Latency=%dus, Attempts=%d, ServiceAvailable=%s",
+            orderId.value(),
+            orderEvent.symbol(),
+            orderEvent.side(),
+            orderEvent.quantity(),
+            orderEvent.price(),
+            approved ? "APPROVED" : "REJECTED",
+            riskResult.decision().reasonCode(),
+            riskResult.latencyNanos() / 1000,
+            riskResult.attempts(),
+            riskResult.serviceAvailable()
+        );
+        
+        // Use SLF4J logger in production; using System.out for now
+        System.out.println(logMessage);
     }
     
     /**
@@ -322,6 +393,13 @@ public class OMSService implements AutoCloseable {
         );
     }
     
+    /**
+     * Gets risk check metrics.
+     */
+    public RiskCheckService.RiskMetrics getRiskMetrics() {
+        return riskCheckService.getMetrics();
+    }
+    
     @Override
     public void close() throws IOException {
         commandLog.close();
@@ -334,22 +412,28 @@ public class OMSService implements AutoCloseable {
         long orderId,
         String message,
         String correlationId,
-        long latencyNanos
+        long latencyNanos,
+        boolean riskRejected,
+        int riskReasonCode
     ) {
         public static SubmissionResult success(long orderId, String correlationId, long latencyNanos) {
-            return new SubmissionResult(true, orderId, "Order submitted successfully", correlationId, latencyNanos);
+            return new SubmissionResult(true, orderId, "Order submitted successfully", correlationId, latencyNanos, false, 0);
         }
         
         public static SubmissionResult alreadyExists(long orderId, String correlationId) {
-            return new SubmissionResult(true, orderId, "Order already exists (idempotent)", correlationId, 0);
+            return new SubmissionResult(true, orderId, "Order already exists (idempotent)", correlationId, 0, false, 0);
+        }
+        
+        public static SubmissionResult riskRejection(long orderId, String message, int reasonCode, String correlationId, long latencyNanos) {
+            return new SubmissionResult(false, orderId, "Risk rejection: " + message, correlationId, latencyNanos, true, reasonCode);
         }
         
         public static SubmissionResult validationError(String message, String correlationId) {
-            return new SubmissionResult(false, 0, "Validation error: " + message, correlationId, 0);
+            return new SubmissionResult(false, 0, "Validation error: " + message, correlationId, 0, false, 0);
         }
         
         public static SubmissionResult error(String message, String correlationId) {
-            return new SubmissionResult(false, 0, message, correlationId, 0);
+            return new SubmissionResult(false, 0, message, correlationId, 0, false, 0);
         }
     }
     
