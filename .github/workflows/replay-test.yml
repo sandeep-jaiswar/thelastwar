@@ -1,9 +1,9 @@
 name: Deterministic Replay Validation
 on:
   pull_request:
-    branches: [ production, main ]
+    branches: [ production ]
   push:
-    branches: [ production, main ]
+    branches: [ production ]
   workflow_dispatch:
 
 jobs:
