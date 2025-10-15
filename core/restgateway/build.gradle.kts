@@ -5,6 +5,7 @@ plugins {
 dependencies {
     // Internal dependencies
     api(project(":core:eventbus"))
+    api(project(":core:oms"))
     
     // Spring WebFlux (Reactor Netty) for reactive REST
     implementation("org.springframework.boot:spring-boot-starter-webflux:3.2.2")

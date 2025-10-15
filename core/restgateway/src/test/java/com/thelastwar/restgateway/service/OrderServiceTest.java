@@ -33,7 +33,7 @@ class OrderServiceTest {
     
     @Test
     void testSubmitOrder() {
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         
         StepVerifier.create(orderService.submitOrder(request))
                 .assertNext(orderId -> {
@@ -45,7 +45,7 @@ class OrderServiceTest {
     
     @Test
     void testSubmitInvalidOrder() {
-        OrderRequest request = new OrderRequest("", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-", "", "BUY", "LIMIT", 100, 15000, 999);
         
         StepVerifier.create(orderService.submitOrder(request))
                 .expectError(IllegalArgumentException.class)
@@ -54,7 +54,7 @@ class OrderServiceTest {
     
     @Test
     void testGetOrderStatus() throws InterruptedException {
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         
         // Submit order
         Long orderId = orderService.submitOrder(request).block();
@@ -84,7 +84,7 @@ class OrderServiceTest {
     
     @Test
     void testCancelOrder() throws InterruptedException {
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         
         // Submit order
         Long orderId = orderService.submitOrder(request).block();
@@ -115,7 +115,7 @@ class OrderServiceTest {
             latch.countDown();
         });
         
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         orderService.submitOrder(request).block();
         
         assertTrue(latch.await(1, TimeUnit.SECONDS), "Event should be published");
@@ -124,7 +124,7 @@ class OrderServiceTest {
     @Test
     void testMultipleOrders() {
         for (int i = 0; i < 10; i++) {
-            OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+            OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
             
             StepVerifier.create(orderService.submitOrder(request))
                     .assertNext(orderId -> assertTrue(orderId > 0))

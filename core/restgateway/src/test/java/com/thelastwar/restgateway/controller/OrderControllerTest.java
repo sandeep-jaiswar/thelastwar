@@ -26,7 +26,7 @@ class OrderControllerTest {
     
     @Test
     void testSubmitOrderSuccess() {
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         
         StepVerifier.create(orderController.submitOrder(request))
                 .assertNext(response -> {
@@ -39,7 +39,7 @@ class OrderControllerTest {
     
     @Test
     void testSubmitInvalidOrder() {
-        OrderRequest request = new OrderRequest("", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-", "", "BUY", "LIMIT", 100, 15000, 999);
         
         StepVerifier.create(orderController.submitOrder(request))
                 .assertNext(response -> {
@@ -52,7 +52,7 @@ class OrderControllerTest {
     @Test
     void testGetOrderStatus() throws InterruptedException {
         // Submit an order first
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         Long orderId = orderController.submitOrder(request).block().data();
         
         Thread.sleep(100);
@@ -78,7 +78,7 @@ class OrderControllerTest {
     @Test
     void testCancelOrder() throws InterruptedException {
         // Submit an order first
-        OrderRequest request = new OrderRequest("AAPL", "BUY", "LIMIT", 100, 15000, 999);
+        OrderRequest request = new OrderRequest("CLIENT-AUTO-AAPL", "AAPL", "BUY", "LIMIT", 100, 15000, 999);
         Long orderId = orderController.submitOrder(request).block().data();
         
         Thread.sleep(100);
