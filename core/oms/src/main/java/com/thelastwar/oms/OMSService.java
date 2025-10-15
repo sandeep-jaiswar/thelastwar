@@ -400,6 +400,14 @@ public class OMSService implements AutoCloseable {
         return riskCheckService.getMetrics();
     }
     
+    /**
+     * Gets the risk check service for direct access.
+     * Used by REST API for standalone risk checks.
+     */
+    public RiskCheckService getRiskCheckService() {
+        return riskCheckService;
+    }
+    
     @Override
     public void close() throws IOException {
         commandLog.close();
