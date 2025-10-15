@@ -44,7 +44,7 @@ public class RiskController {
             
             // Create OrderEvent for risk check
             OrderEvent orderEvent = OrderEvent.newOrder(
-                0L,  // orderId not yet assigned
+                1L,  // temporary orderId for risk check (actual order not yet created)
                 request.symbol(),
                 request.getSideByte(),
                 request.getOrderTypeByte(),
