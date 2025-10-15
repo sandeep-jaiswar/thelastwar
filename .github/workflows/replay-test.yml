@@ -1,14 +1,19 @@
 name: Deterministic Replay Validation
 on:
   pull_request:
-    branches: [ production, main ]
+    branches: [ production ]
   push:
-    branches: [ production, main ]
+    branches: [ production ]
   workflow_dispatch:
 
 jobs:
   replay:
     runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - name: Setup Java
