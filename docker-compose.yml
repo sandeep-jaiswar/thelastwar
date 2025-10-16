@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # LocalStack - Local AWS Cloud Stack
   localstack:
