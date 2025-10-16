@@ -140,29 +140,47 @@ multi-asset-trading-platform/
     ├── COPILOT_INSTRUCTIONS.md
     └── workflows/
 
-🧭 Local Setup
-Prerequisites
+🧭 Local Development Setup
 
-JDK 25+
+For comprehensive local development environment setup, see **[README-local.md](./README-local.md)**
 
-Docker & Docker Compose
+### Quick Start
 
-Gradle Wrapper (./gradlew)
+```bash
+# Start all services (LocalStack, Kafka, PostgreSQL, ClickHouse, Redis)
+make quickstart
 
-Optional: Linux (low-latency tuned kernel recommended)
+# Or manually
+docker compose up -d
+./scripts/localstack-bootstrap.sh
 
-Run Locally
-docker-compose up
-./gradlew run
+# Validate setup
+make validate
 
+# Build the project
+./gradlew build
 
-Access:
+# Run integration examples
+make test-integration
+```
 
-Trader UI → http://localhost:8080
+### Prerequisites
 
-Grafana → http://localhost:3000
+- **JDK 25+**
+- **Docker & Docker Compose**
+- **Gradle Wrapper** (./gradlew)
+- **AWS CLI** (for LocalStack interaction)
+- Optional: Linux (low-latency tuned kernel recommended)
 
-Prometheus → http://localhost:9090
+### Access Points
+
+- **LocalStack** (AWS services) → http://localhost:4566
+- **Redpanda Console** (Kafka UI) → http://localhost:8080
+- **PostgreSQL** → localhost:5432
+- **ClickHouse** → http://localhost:8123
+- **Redis** → localhost:6379
+
+See [README-local.md](./README-local.md) for detailed setup instructions, testing guides, and integration examples.
 
 🤖 Copilot Guidance
 
