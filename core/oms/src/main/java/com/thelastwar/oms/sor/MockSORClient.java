@@ -96,7 +96,7 @@ public class MockSORClient implements SORClient {
                 
                 return decision;
                 
-            } catch (Exception e) {
+            } catch (InterruptedException e) {
                 failedRoutings.incrementAndGet();
                 
                 // Notify listeners of failure
