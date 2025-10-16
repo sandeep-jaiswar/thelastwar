@@ -57,7 +57,18 @@ public class OMSController {
                     true,
                     result.orderId(),
                     request.clientOrderId(),
-                    result.message(), // Use message from OMSService
+                    result.message(),
+                    result.correlationId(),
+                    result.latencyNanos(),
+                    false,
+                    0
+                );
+            } else if (result.riskRejected()) {
+                return OrderSubmissionResponse.riskRejection(
+                    result.orderId(),
+                    request.clientOrderId(),
+                    result.message(),
+                    result.riskReasonCode(),
                     result.correlationId(),
                     result.latencyNanos()
                 );
