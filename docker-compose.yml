@@ -70,7 +70,7 @@ services:
         connect:
           enabled: false
     ports:
-      - "8080:8080"
+      - "8090:8080"
     networks:
       - trading-network
     depends_on:

@@ -92,7 +92,7 @@ quickstart: up
 	@echo ""
 	@echo "Access points:"
 	@echo "  - LocalStack:        http://localhost:4566"
-	@echo "  - Redpanda Console:  http://localhost:8080"
+	@echo "  - Redpanda Console:  http://localhost:8090"
 	@echo "  - PostgreSQL:        localhost:5432"
 	@echo "  - ClickHouse:        http://localhost:8123"
 	@echo "  - Redis:             localhost:6379"

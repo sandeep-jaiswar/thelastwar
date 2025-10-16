@@ -54,7 +54,7 @@ This will start:
 - PostgreSQL on `localhost:5432`
 - ClickHouse on `localhost:8123`
 - Redis on `localhost:6379`
-- Redpanda Console on `localhost:8080`
+- Redpanda Console on `localhost:8090`
 
 ### 2. Verify Services are Running
 
@@ -82,9 +82,10 @@ Or run it directly (requires AWS CLI):
 
 ### 4. Access Service UIs
 
-- **Redpanda Console** (Kafka UI): http://localhost:8080
+- **Redpanda Console** (Kafka UI): http://localhost:8090
 - **LocalStack Health**: http://localhost:4566/_localstack/health
 - **ClickHouse UI**: http://localhost:8123/play
+- **Trader UI** (if deployed): http://localhost:8080
 
 ## 🔧 Service Configuration
 
@@ -151,7 +152,7 @@ Secrets:
 **Kafka Bootstrap Server**: `localhost:19092`
 **Schema Registry**: `localhost:18081`
 **Admin API**: `localhost:9644`
-**Web Console**: `localhost:8080`
+**Web Console**: `localhost:8090`
 
 ### PostgreSQL
 

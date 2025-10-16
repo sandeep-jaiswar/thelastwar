@@ -175,7 +175,8 @@ make test-integration
 ### Access Points
 
 - **LocalStack** (AWS services) → http://localhost:4566
-- **Redpanda Console** (Kafka UI) → http://localhost:8080
+- **Redpanda Console** (Kafka UI) → http://localhost:8090
+- **Trader UI** (if available) → http://localhost:8080
 - **PostgreSQL** → localhost:5432
 - **ClickHouse** → http://localhost:8123
 - **Redis** → localhost:6379

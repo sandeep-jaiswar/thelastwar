@@ -29,7 +29,7 @@ Created a comprehensive Docker Compose configuration with the following services
 - **Features**:
   - Kafka-compatible event streaming
   - Dev-mode configuration for local use
-  - Web console for management (port 8080)
+  - Web console for management (port 8090)
 
 #### PostgreSQL
 - **Image**: `postgres:16-alpine`
@@ -245,7 +245,7 @@ Comprehensive validation:
   - PostgreSQL: localhost:5432
   - ClickHouse: localhost:8123
   - Redis: localhost:6379
-  - Redpanda Console: localhost:8080
+  - Redpanda Console: localhost:8090
 
 ### ✅ Zero External Dependencies
 - [x] Fully offline-ready
