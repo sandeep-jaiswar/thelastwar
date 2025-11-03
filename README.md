@@ -35,7 +35,7 @@ The architecture is **event-driven, memory-resident, and horizontally sharded**,
 ## ⚙️ Technology Stack
 
 ### Language & Runtime
-- **Java 25** (primary language)
+- **Java 21** (primary language)
 - **Kotlin** (utility & DSL modules)
 - **JMH / Chronicle Benchmark** (micro-benchmarks)
 
@@ -43,7 +43,7 @@ The architecture is **event-driven, memory-resident, and horizontally sharded**,
 - **Aeron** / **Chronicle Queue** (low-latency transport)
 - **Kafka** / **Redpanda** (persistent event log)
 - **Chronicle Map** (off-heap cache)
-- **PostgreSQL / ClickHouse** (persistence)
+- **ClickHouse** (high-performance analytics and persistence)
 - **Avro / Protobuf** (schema evolution)
 
 ### Build & Dependency Management
@@ -86,7 +86,7 @@ Deterministic replay: event log acts as system-of-record.
 
 Coding Standards
 
-Java 25 with strict compiler flags (-Xlint:all -Werror).
+Java 21 with strict compiler flags (-Xlint:all -Werror).
 
 Static analysis via PMD, SpotBugs, and ErrorProne.
 
@@ -141,11 +141,32 @@ multi-asset-trading-platform/
     └── workflows/
 
 🧭 Local Setup
-Prerequisites
 
-JDK 25+
+For complete local setup instructions (without Docker/Kubernetes), see [LOCAL_SETUP.md](LOCAL_SETUP.md).
 
-Docker & Docker Compose
+### Quick Start
+
+```bash
+# Complete automated setup
+./scripts/setup-local.sh
+
+# Start all services
+./scripts/start-services.sh
+
+# Check service status
+./scripts/check-services.sh
+
+# Stop all services
+./scripts/stop-services.sh
+```
+
+### Prerequisites
+
+JDK 21+
+
+ClickHouse 24.3+
+
+Kafka 3.8.0+
 
 Gradle Wrapper (./gradlew)
 

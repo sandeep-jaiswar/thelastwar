@@ -6,7 +6,7 @@ import com.thelastwar.oms.eventsourcing.KafkaEventPublisher;
 import com.thelastwar.oms.eventsourcing.OrderEvent;
 import com.thelastwar.oms.persistence.OrderStateRecord;
 import com.thelastwar.oms.persistence.OrderStateStore;
-import com.thelastwar.oms.persistence.PostgresOrderStateStore;
+import com.thelastwar.oms.persistence.ClickHouseOrderStateStore;
 import com.thelastwar.oms.recovery.RecoveryResult;
 import com.thelastwar.oms.recovery.RecoveryService;
 import com.thelastwar.oms.snapshot.SnapshotConfig;
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.ClickHouseContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Integration tests for OMS persistence, snapshotting, and recovery.
  * 
  * Tests the complete flow:
- * 1. Store orders in PostgreSQL
+ * 1. Store orders in ClickHouse
  * 2. Publish events to Kafka
  * 3. Create snapshots
  * 4. Recover from snapshot + event replay
@@ -48,11 +48,9 @@ class OMSPersistenceIntegrationTest {
     private static final Logger logger = LoggerFactory.getLogger(OMSPersistenceIntegrationTest.class);
     
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
-        DockerImageName.parse("postgres:16-alpine"))
-        .withDatabaseName("oms_test")
-        .withUsername("test")
-        .withPassword("test");
+    static ClickHouseContainer clickhouse = new ClickHouseContainer(
+        DockerImageName.parse("clickhouse/clickhouse-server:24.3-alpine"))
+        .withExposedPorts(8123);
     
     @Container
     static KafkaContainer kafka = new KafkaContainer(
@@ -70,12 +68,12 @@ class OMSPersistenceIntegrationTest {
     
     @BeforeEach
     void setUp() throws Exception {
-        // Initialize PostgreSQL store
-        String jdbcUrl = postgres.getJdbcUrl();
-        orderStateStore = new PostgresOrderStateStore(
+        // Initialize ClickHouse store
+        String jdbcUrl = clickhouse.getJdbcUrl();
+        orderStateStore = new ClickHouseOrderStateStore(
             jdbcUrl,
-            postgres.getUsername(),
-            postgres.getPassword()
+            clickhouse.getUsername(),
+            clickhouse.getPassword()
         );
         
         // Initialize Kafka publisher
