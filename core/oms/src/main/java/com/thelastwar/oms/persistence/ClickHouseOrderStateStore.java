@@ -32,6 +32,21 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
     
     private static final Logger logger = LoggerFactory.getLogger(ClickHouseOrderStateStore.class);
     
+    private static final String INSERT_SQL = """
+        INSERT INTO oms_order_state 
+        (internal_order_id, client_order_id, symbol, side, order_type, quantity, price, 
+         account, current_state, filled_quantity, remaining_quantity, created_at, updated_at, version)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)
+        """;
+    
+    private static final String SELECT_COLUMNS = """
+        internal_order_id, client_order_id, symbol, side, order_type, quantity, 
+        price, account, current_state, filled_quantity, remaining_quantity, version
+        """;
+    
+    private static final String ACTIVE_STATES_FILTER = 
+        "current_state IN ('NEW', 'ACCEPTED', 'WORKING', 'PARTIAL_FILL')";
+    
     private final HikariDataSource dataSource;
     private final ConcurrentHashMap<Long, OrderStateRecord> cache;
     
@@ -93,29 +108,10 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
     @Override
     public void saveOrderState(OrderStateRecord orderState) throws SQLException {
         // In ClickHouse, we insert a new row and let ReplacingMergeTree handle deduplication
-        String insertSql = """
-            INSERT INTO oms_order_state 
-            (internal_order_id, client_order_id, symbol, side, order_type, quantity, price, 
-             account, current_state, filled_quantity, remaining_quantity, created_at, updated_at, version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)
-            """;
-        
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+             PreparedStatement stmt = conn.prepareStatement(INSERT_SQL)) {
             
-            stmt.setLong(1, orderState.internalOrderId());
-            stmt.setString(2, orderState.clientOrderId());
-            stmt.setString(3, orderState.symbol());
-            stmt.setShort(4, orderState.side());
-            stmt.setShort(5, orderState.orderType());
-            stmt.setLong(6, orderState.quantity());
-            stmt.setLong(7, orderState.price());
-            stmt.setLong(8, orderState.account());
-            stmt.setString(9, orderState.currentState().name());
-            stmt.setLong(10, orderState.filledQuantity());
-            stmt.setLong(11, orderState.remainingQuantity());
-            stmt.setLong(12, orderState.version());
-            
+            setOrderStateParameters(stmt, orderState);
             stmt.executeUpdate();
             cache.put(orderState.internalOrderId(), orderState);
             
@@ -128,31 +124,12 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
     
     @Override
     public void saveOrderStateBatch(Iterable<OrderStateRecord> records) throws SQLException {
-        String insertSql = """
-            INSERT INTO oms_order_state 
-            (internal_order_id, client_order_id, symbol, side, order_type, quantity, price, 
-             account, current_state, filled_quantity, remaining_quantity, created_at, updated_at, version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)
-            """;
-        
         try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+             PreparedStatement stmt = conn.prepareStatement(INSERT_SQL)) {
             
             int batchCount = 0;
             for (OrderStateRecord orderState : records) {
-                stmt.setLong(1, orderState.internalOrderId());
-                stmt.setString(2, orderState.clientOrderId());
-                stmt.setString(3, orderState.symbol());
-                stmt.setShort(4, orderState.side());
-                stmt.setShort(5, orderState.orderType());
-                stmt.setLong(6, orderState.quantity());
-                stmt.setLong(7, orderState.price());
-                stmt.setLong(8, orderState.account());
-                stmt.setString(9, orderState.currentState().name());
-                stmt.setLong(10, orderState.filledQuantity());
-                stmt.setLong(11, orderState.remainingQuantity());
-                stmt.setLong(12, orderState.version());
-                
+                setOrderStateParameters(stmt, orderState);
                 stmt.addBatch();
                 batchCount++;
                 
@@ -186,13 +163,12 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
         }
         
         // Use FINAL to get the latest version after ReplacingMergeTree deduplication
-        String selectSql = """
-            SELECT internal_order_id, client_order_id, symbol, side, order_type, quantity, 
-                   price, account, current_state, filled_quantity, remaining_quantity, version
+        String selectSql = String.format("""
+            SELECT %s
             FROM oms_order_state FINAL
             WHERE internal_order_id = ?
             LIMIT 1
-            """;
+            """, SELECT_COLUMNS);
         
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(selectSql)) {
@@ -221,13 +197,12 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
         Map<Long, OrderStateRecord> result = new HashMap<>();
         
         // Use FINAL to get deduplicated results
-        String selectSql = """
-            SELECT internal_order_id, client_order_id, symbol, side, order_type, quantity, 
-                   price, account, current_state, filled_quantity, remaining_quantity, version
+        String selectSql = String.format("""
+            SELECT %s
             FROM oms_order_state FINAL
-            WHERE current_state IN ('NEW', 'ACCEPTED', 'WORKING', 'PARTIAL_FILL')
+            WHERE %s
             ORDER BY internal_order_id
-            """;
+            """, SELECT_COLUMNS, ACTIVE_STATES_FILTER);
         
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
@@ -250,14 +225,14 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
     
     @Override
     public long countActiveOrders() throws SQLException {
-        String countSql = """
+        String countSql = String.format("""
             SELECT COUNT(*) as count
             FROM (
                 SELECT internal_order_id
                 FROM oms_order_state FINAL
-                WHERE current_state IN ('NEW', 'ACCEPTED', 'WORKING', 'PARTIAL_FILL')
+                WHERE %s
             )
-            """;
+            """, ACTIVE_STATES_FILTER);
         
         try (Connection conn = dataSource.getConnection();
              Statement stmt = conn.createStatement();
@@ -272,6 +247,24 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
             logger.error("Failed to count active orders in ClickHouse", e);
             throw new SQLException("Failed to count active orders in ClickHouse", e);
         }
+    }
+    
+    /**
+     * Sets all parameters for an order state insert/update operation.
+     */
+    private void setOrderStateParameters(PreparedStatement stmt, OrderStateRecord orderState) throws SQLException {
+        stmt.setLong(1, orderState.internalOrderId());
+        stmt.setString(2, orderState.clientOrderId());
+        stmt.setString(3, orderState.symbol());
+        stmt.setShort(4, orderState.side());
+        stmt.setShort(5, orderState.orderType());
+        stmt.setLong(6, orderState.quantity());
+        stmt.setLong(7, orderState.price());
+        stmt.setLong(8, orderState.account());
+        stmt.setString(9, orderState.currentState().name());
+        stmt.setLong(10, orderState.filledQuantity());
+        stmt.setLong(11, orderState.remainingQuantity());
+        stmt.setLong(12, orderState.version());
     }
     
     private OrderStateRecord mapResultSetToRecord(ResultSet rs) throws SQLException {
