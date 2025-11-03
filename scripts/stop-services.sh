@@ -15,6 +15,9 @@ echo -e "${BLUE}Stopping Trading System Services${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
+# Track which services were stopped
+STOPPED_SERVICES=()
+
 # Step 1: Stop Kafka
 echo -e "${BLUE}Step 1: Stopping Kafka...${NC}"
 if pgrep -f "kafka.Kafka" > /dev/null; then
@@ -27,6 +30,7 @@ if pgrep -f "kafka.Kafka" > /dev/null; then
     fi
     
     echo -e "${GREEN}✓ Kafka stopped${NC}"
+    STOPPED_SERVICES+=("Kafka")
 else
     echo -e "${YELLOW}⚠ Kafka is not running${NC}"
 fi
@@ -44,6 +48,7 @@ if pgrep -f "zookeeper" > /dev/null; then
     fi
     
     echo -e "${GREEN}✓ Zookeeper stopped${NC}"
+    STOPPED_SERVICES+=("Zookeeper")
 else
     echo -e "${YELLOW}⚠ Zookeeper is not running${NC}"
 fi
@@ -64,9 +69,16 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Services Stopped${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
-echo -e "${GREEN}Stopped services:${NC}"
-echo -e "  ✓ Kafka"
-echo -e "  ✓ Zookeeper"
+
+if [ ${#STOPPED_SERVICES[@]} -gt 0 ]; then
+    echo -e "${GREEN}Stopped services:${NC}"
+    for service in "${STOPPED_SERVICES[@]}"; do
+        echo -e "  ✓ $service"
+    done
+else
+    echo -e "${YELLOW}No services were stopped (none were running)${NC}"
+fi
+
 echo ""
 echo -e "${YELLOW}Note: ClickHouse is left running by default${NC}"
 echo -e "To stop ClickHouse: ${GREEN}sudo systemctl stop clickhouse-server${NC}"

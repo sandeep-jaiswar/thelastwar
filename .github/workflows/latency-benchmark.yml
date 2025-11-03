@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 21
       - name: Run JMH Benchmarks for ${{ matrix.module }}
         run: ./gradlew :core:${{ matrix.module }}:jmh --no-daemon
       - name: Upload benchmark results for ${{ matrix.module }}
