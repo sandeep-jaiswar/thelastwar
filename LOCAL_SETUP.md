@@ -136,6 +136,9 @@ sudo mkdir -p /var/lib/kafka/kraft-combined-logs
 sudo mkdir -p /var/lib/kafka/logs
 sudo chown -R $USER:$USER /var/lib/kafka
 
+# Create KRaft config directory
+sudo mkdir -p /opt/kafka/config/kraft
+
 # Configure Kafka in KRaft mode (no Zookeeper needed)
 # Generate a cluster UUID
 CLUSTER_UUID=$(/opt/kafka/bin/kafka-storage.sh random-uuid)

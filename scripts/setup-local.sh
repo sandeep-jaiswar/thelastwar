@@ -135,15 +135,18 @@ else
     rm kafka_2.13-3.8.0.tgz
     
     # Create Kafka directories
-    sudo mkdir -p /var/lib/kafka/data
+    sudo mkdir -p /var/lib/kafka/kraft-combined-logs
     sudo mkdir -p /var/lib/kafka/logs
     sudo chown -R $USER:$USER /var/lib/kafka
+    
+    # Create KRaft config directory if it doesn't exist
+    sudo mkdir -p $KAFKA_DIR/config/kraft
     
     # Configure Kafka in KRaft mode (no Zookeeper)
     # Generate a cluster UUID for KRaft
     CLUSTER_UUID=$($KAFKA_DIR/bin/kafka-storage.sh random-uuid)
     
-    cat > $KAFKA_DIR/config/kraft/server.properties << EOF
+    sudo tee $KAFKA_DIR/config/kraft/server.properties > /dev/null << EOF
 # KRaft mode configuration (replaces Zookeeper)
 process.roles=broker,controller
 node.id=1
