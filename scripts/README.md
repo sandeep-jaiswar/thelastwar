@@ -33,23 +33,21 @@ Starts all required services for the trading system.
 
 **What it does:**
 - Starts ClickHouse server
-- Starts Zookeeper
-- Starts Kafka
+- Starts Kafka in KRaft mode (no Zookeeper required)
 - Creates required Kafka topics (oms-events, execution-events, trade-events)
 - Initializes ClickHouse database schema
 
 **Logs location:** `/var/lib/trading-system/logs/`
 
 ### stop-services.sh
-Stops Kafka and Zookeeper services.
+Stops Kafka services.
 
 ```bash
 ./scripts/stop-services.sh
 ```
 
 **What it does:**
-- Stops Kafka broker
-- Stops Zookeeper
+- Stops Kafka broker (KRaft mode)
 - Leaves ClickHouse running (by design)
 
 **Note:** To stop ClickHouse manually:
@@ -66,8 +64,7 @@ Checks the status of all services.
 
 **What it displays:**
 - ClickHouse server status and version
-- Zookeeper status and PID
-- Kafka status and connectivity
+- Kafka status and connectivity (KRaft mode)
 - List of Kafka topics
 - ClickHouse database and table status
 - Record counts
@@ -200,8 +197,7 @@ All scripts follow standard exit code conventions:
 ## Log Files
 
 Logs are stored in `/var/lib/trading-system/logs/`:
-- `zookeeper.log` - Zookeeper service logs
-- `kafka.log` - Kafka broker logs
+- `kafka.log` - Kafka broker logs (KRaft mode)
 - Application logs (when running application components)
 
 System logs:

@@ -30,32 +30,14 @@ if pgrep -f "kafka.Kafka" > /dev/null; then
     fi
     
     echo -e "${GREEN}✓ Kafka stopped${NC}"
-    STOPPED_SERVICES+=("Kafka")
+    STOPPED_SERVICES+=("Kafka (KRaft mode)")
 else
     echo -e "${YELLOW}⚠ Kafka is not running${NC}"
 fi
 echo ""
 
-# Step 2: Stop Zookeeper
-echo -e "${BLUE}Step 2: Stopping Zookeeper...${NC}"
-if pgrep -f "zookeeper" > /dev/null; then
-    $KAFKA_DIR/bin/zookeeper-server-stop.sh
-    sleep 3
-    
-    # Force kill if still running
-    if pgrep -f "zookeeper" > /dev/null; then
-        pkill -9 -f "zookeeper"
-    fi
-    
-    echo -e "${GREEN}✓ Zookeeper stopped${NC}"
-    STOPPED_SERVICES+=("Zookeeper")
-else
-    echo -e "${YELLOW}⚠ Zookeeper is not running${NC}"
-fi
-echo ""
-
-# Step 3: Stop ClickHouse (optional - commented out by default)
-echo -e "${BLUE}Step 3: ClickHouse status...${NC}"
+# Step 2: Stop ClickHouse (optional - commented out by default)
+echo -e "${BLUE}Step 2: ClickHouse status...${NC}"
 if sudo systemctl is-active --quiet clickhouse-server; then
     echo -e "${YELLOW}⚠ ClickHouse is still running${NC}"
     echo -e "${YELLOW}  To stop: sudo systemctl stop clickhouse-server${NC}"

@@ -132,37 +132,48 @@ sudo mv kafka_2.13-3.8.0 kafka
 sudo rm kafka_2.13-3.8.0.tgz
 
 # Create Kafka data directories
-sudo mkdir -p /var/lib/kafka/data
+sudo mkdir -p /var/lib/kafka/kraft-combined-logs
 sudo mkdir -p /var/lib/kafka/logs
 sudo chown -R $USER:$USER /var/lib/kafka
 
-# Configure Kafka (edit /opt/kafka/config/server.properties)
-sudo tee /opt/kafka/config/server.properties > /dev/null << EOF
-broker.id=0
-listeners=PLAINTEXT://localhost:9092
-log.dirs=/var/lib/kafka/data
+# Configure Kafka in KRaft mode (no Zookeeper needed)
+# Generate a cluster UUID
+CLUSTER_UUID=$(/opt/kafka/bin/kafka-storage.sh random-uuid)
+
+sudo tee /opt/kafka/config/kraft/server.properties > /dev/null << EOF
+# KRaft mode configuration (replaces Zookeeper)
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@localhost:9093
+listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+inter.broker.listener.name=PLAINTEXT
+advertised.listeners=PLAINTEXT://localhost:9092
+controller.listener.names=CONTROLLER
+log.dirs=/var/lib/kafka/kraft-combined-logs
 num.partitions=8
 default.replication.factor=1
-min.insync.replicas=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
 log.retention.hours=168
 log.segment.bytes=1073741824
-zookeeper.connect=localhost:2181
 EOF
+
+# Format the storage directory with the cluster UUID
+/opt/kafka/bin/kafka-storage.sh format -t $CLUSTER_UUID -c /opt/kafka/config/kraft/server.properties
 ```
 
-#### Start Kafka and Zookeeper
+#### Start Kafka in KRaft Mode (No Zookeeper Required)
+
+Kafka 3.8.0 supports KRaft mode, which eliminates the need for Zookeeper by using Kafka's built-in consensus protocol.
 
 ```bash
-# Start Zookeeper
-nohup /opt/kafka/bin/zookeeper-server-start.sh /opt/kafka/config/zookeeper.properties \
-    > /var/lib/kafka/logs/zookeeper.log 2>&1 &
-
-# Wait for Zookeeper to start
-sleep 5
-
-# Start Kafka
-nohup /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties \
+# Start Kafka in KRaft mode
+nohup /opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/kraft/server.properties \
     > /var/lib/kafka/logs/kafka.log 2>&1 &
+
+# Wait for Kafka to start
+sleep 10
 
 # Verify Kafka is running
 /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
@@ -433,11 +444,11 @@ clickhouse-client --host localhost --port 9000 --query "SELECT 1"
 
 **Problem**: Kafka won't start
 ```bash
-# Check Zookeeper is running
-jps | grep QuorumPeerMain
-
 # Check Kafka logs
 tail -f /var/lib/kafka/logs/kafka.log
+
+# Verify KRaft storage is formatted
+ls -la /var/lib/kafka/kraft-combined-logs/
 
 # Restart Kafka
 ./scripts/stop-services.sh

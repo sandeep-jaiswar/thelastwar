@@ -139,20 +139,33 @@ else
     sudo mkdir -p /var/lib/kafka/logs
     sudo chown -R $USER:$USER /var/lib/kafka
     
-    # Configure Kafka
-    cat > $KAFKA_DIR/config/server.properties << EOF
-broker.id=0
-listeners=PLAINTEXT://localhost:9092
-log.dirs=/var/lib/kafka/data
+    # Configure Kafka in KRaft mode (no Zookeeper)
+    # Generate a cluster UUID for KRaft
+    CLUSTER_UUID=$($KAFKA_DIR/bin/kafka-storage.sh random-uuid)
+    
+    cat > $KAFKA_DIR/config/kraft/server.properties << EOF
+# KRaft mode configuration (replaces Zookeeper)
+process.roles=broker,controller
+node.id=1
+controller.quorum.voters=1@localhost:9093
+listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+inter.broker.listener.name=PLAINTEXT
+advertised.listeners=PLAINTEXT://localhost:9092
+controller.listener.names=CONTROLLER
+log.dirs=/var/lib/kafka/kraft-combined-logs
 num.partitions=8
 default.replication.factor=1
-min.insync.replicas=1
+offsets.topic.replication.factor=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
 log.retention.hours=168
 log.segment.bytes=1073741824
-zookeeper.connect=localhost:2181
 EOF
     
-    echo -e "${GREEN}✓ Kafka installed successfully${NC}"
+    # Format the storage directory with the cluster UUID
+    $KAFKA_DIR/bin/kafka-storage.sh format -t $CLUSTER_UUID -c $KAFKA_DIR/config/kraft/server.properties
+    
+    echo -e "${GREEN}✓ Kafka installed and configured in KRaft mode (no Zookeeper required)${NC}"
 fi
 echo ""
 

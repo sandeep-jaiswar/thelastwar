@@ -31,19 +31,8 @@ else
 fi
 echo ""
 
-# Check Zookeeper
-echo -e "${BLUE}Zookeeper:${NC}"
-if pgrep -f "zookeeper" > /dev/null; then
-    echo -e "  Status: ${GREEN}Running ✓${NC}"
-    PID=$(pgrep -f "zookeeper")
-    echo -e "  PID: $PID"
-else
-    echo -e "  Status: ${RED}Not running ✗${NC}"
-fi
-echo ""
-
-# Check Kafka
-echo -e "${BLUE}Kafka:${NC}"
+# Check Kafka (KRaft mode)
+echo -e "${BLUE}Kafka (KRaft mode - no Zookeeper):${NC}"
 if pgrep -f "kafka.Kafka" > /dev/null; then
     echo -e "  Status: ${GREEN}Running ✓${NC}"
     PID=$(pgrep -f "kafka.Kafka")
@@ -92,10 +81,6 @@ echo -e "${BLUE}========================================${NC}"
 ALL_OK=true
 
 if ! sudo systemctl is-active --quiet clickhouse-server; then
-    ALL_OK=false
-fi
-
-if ! pgrep -f "zookeeper" > /dev/null; then
     ALL_OK=false
 fi
 

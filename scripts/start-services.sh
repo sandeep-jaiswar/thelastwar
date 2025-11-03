@@ -42,50 +42,30 @@ else
 fi
 echo ""
 
-# Step 2: Start Zookeeper
-echo -e "${BLUE}Step 2: Starting Zookeeper...${NC}"
-if is_running "zookeeper"; then
-    echo -e "${GREEN}✓ Zookeeper is already running${NC}"
-else
-    nohup $KAFKA_DIR/bin/zookeeper-server-start.sh \
-        $KAFKA_DIR/config/zookeeper.properties \
-        > $LOG_DIR/zookeeper.log 2>&1 &
-    
-    echo "Waiting for Zookeeper to start..."
-    sleep 5
-    
-    if is_running "zookeeper"; then
-        echo -e "${GREEN}✓ Zookeeper started successfully${NC}"
-    else
-        echo -e "${RED}✗ Failed to start Zookeeper${NC}"
-        exit 1
-    fi
-fi
-echo ""
-
-# Step 3: Start Kafka
-echo -e "${BLUE}Step 3: Starting Kafka...${NC}"
+# Step 2: Start Kafka in KRaft mode (no Zookeeper needed)
+echo -e "${BLUE}Step 2: Starting Kafka (KRaft mode - no Zookeeper)...${NC}"
 if is_running "kafka.Kafka"; then
     echo -e "${GREEN}✓ Kafka is already running${NC}"
 else
     nohup $KAFKA_DIR/bin/kafka-server-start.sh \
-        $KAFKA_DIR/config/server.properties \
+        $KAFKA_DIR/config/kraft/server.properties \
         > $LOG_DIR/kafka.log 2>&1 &
     
     echo "Waiting for Kafka to start..."
     sleep 10
     
     if is_running "kafka.Kafka"; then
-        echo -e "${GREEN}✓ Kafka started successfully${NC}"
+        echo -e "${GREEN}✓ Kafka started successfully in KRaft mode${NC}"
     else
         echo -e "${RED}✗ Failed to start Kafka${NC}"
+        echo -e "${YELLOW}Check logs: tail -f $LOG_DIR/kafka.log${NC}"
         exit 1
     fi
 fi
 echo ""
 
-# Step 4: Create Kafka topics
-echo -e "${BLUE}Step 4: Creating Kafka topics...${NC}"
+# Step 3: Create Kafka topics
+echo -e "${BLUE}Step 3: Creating Kafka topics...${NC}"
 
 create_topic() {
     local topic=$1
@@ -106,8 +86,8 @@ create_topic "execution-events"
 create_topic "trade-events"
 echo ""
 
-# Step 5: Initialize ClickHouse schema
-echo -e "${BLUE}Step 5: Initializing ClickHouse schema...${NC}"
+# Step 4: Initialize ClickHouse schema
+echo -e "${BLUE}Step 4: Initializing ClickHouse schema...${NC}"
 clickhouse-client --database=trading_system --user=trading_user --password=trading_password << 'EOF' || true
 CREATE TABLE IF NOT EXISTS oms_order_state (
     internal_order_id Int64,
@@ -138,8 +118,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 echo -e "${GREEN}Running services:${NC}"
 echo -e "  ✓ ClickHouse (port 8123)"
-echo -e "  ✓ Zookeeper (port 2181)"
-echo -e "  ✓ Kafka (port 9092)"
+echo -e "  ✓ Kafka in KRaft mode (port 9092, controller port 9093)"
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
 echo -e "  1. Check service status: ${GREEN}./scripts/check-services.sh${NC}"
