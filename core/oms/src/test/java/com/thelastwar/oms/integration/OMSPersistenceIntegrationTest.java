@@ -7,7 +7,6 @@ import com.thelastwar.oms.eventsourcing.OrderEvent;
 import com.thelastwar.oms.persistence.OrderStateRecord;
 import com.thelastwar.oms.persistence.OrderStateStore;
 import com.thelastwar.oms.persistence.ClickHouseOrderStateStore;
-import com.thelastwar.oms.recovery.RecoveryResult;
 import com.thelastwar.oms.recovery.RecoveryService;
 import com.thelastwar.oms.snapshot.SnapshotConfig;
 import com.thelastwar.oms.snapshot.SnapshotData;
@@ -26,7 +25,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;

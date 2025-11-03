@@ -91,7 +91,7 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
     }
     
     @Override
-    public void saveOrderState(OrderStateRecord record) throws SQLException {
+    public void saveOrderState(OrderStateRecord orderState) throws SQLException {
         // In ClickHouse, we insert a new row and let ReplacingMergeTree handle deduplication
         String insertSql = """
             INSERT INTO oms_order_state 
@@ -103,25 +103,26 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             
-            stmt.setLong(1, record.internalOrderId());
-            stmt.setString(2, record.clientOrderId());
-            stmt.setString(3, record.symbol());
-            stmt.setShort(4, record.side());
-            stmt.setShort(5, record.orderType());
-            stmt.setLong(6, record.quantity());
-            stmt.setLong(7, record.price());
-            stmt.setLong(8, record.account());
-            stmt.setString(9, record.currentState().name());
-            stmt.setLong(10, record.filledQuantity());
-            stmt.setLong(11, record.remainingQuantity());
-            stmt.setLong(12, record.version());
+            stmt.setLong(1, orderState.internalOrderId());
+            stmt.setString(2, orderState.clientOrderId());
+            stmt.setString(3, orderState.symbol());
+            stmt.setShort(4, orderState.side());
+            stmt.setShort(5, orderState.orderType());
+            stmt.setLong(6, orderState.quantity());
+            stmt.setLong(7, orderState.price());
+            stmt.setLong(8, orderState.account());
+            stmt.setString(9, orderState.currentState().name());
+            stmt.setLong(10, orderState.filledQuantity());
+            stmt.setLong(11, orderState.remainingQuantity());
+            stmt.setLong(12, orderState.version());
             
             stmt.executeUpdate();
-            cache.put(record.internalOrderId(), record);
+            cache.put(orderState.internalOrderId(), orderState);
             
         } catch (SQLException e) {
-            logger.error("Failed to save order state for orderId={}", record.internalOrderId(), e);
-            throw e;
+            String errorMsg = String.format("Failed to save order state for orderId=%d", orderState.internalOrderId());
+            logger.error(errorMsg, e);
+            throw new SQLException(errorMsg, e);
         }
     }
     
@@ -138,19 +139,19 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
              PreparedStatement stmt = conn.prepareStatement(insertSql)) {
             
             int batchCount = 0;
-            for (OrderStateRecord record : records) {
-                stmt.setLong(1, record.internalOrderId());
-                stmt.setString(2, record.clientOrderId());
-                stmt.setString(3, record.symbol());
-                stmt.setShort(4, record.side());
-                stmt.setShort(5, record.orderType());
-                stmt.setLong(6, record.quantity());
-                stmt.setLong(7, record.price());
-                stmt.setLong(8, record.account());
-                stmt.setString(9, record.currentState().name());
-                stmt.setLong(10, record.filledQuantity());
-                stmt.setLong(11, record.remainingQuantity());
-                stmt.setLong(12, record.version());
+            for (OrderStateRecord orderState : records) {
+                stmt.setLong(1, orderState.internalOrderId());
+                stmt.setString(2, orderState.clientOrderId());
+                stmt.setString(3, orderState.symbol());
+                stmt.setShort(4, orderState.side());
+                stmt.setShort(5, orderState.orderType());
+                stmt.setLong(6, orderState.quantity());
+                stmt.setLong(7, orderState.price());
+                stmt.setLong(8, orderState.account());
+                stmt.setString(9, orderState.currentState().name());
+                stmt.setLong(10, orderState.filledQuantity());
+                stmt.setLong(11, orderState.remainingQuantity());
+                stmt.setLong(12, orderState.version());
                 
                 stmt.addBatch();
                 batchCount++;
@@ -160,7 +161,7 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
                     stmt.executeBatch();
                 }
                 
-                cache.put(record.internalOrderId(), record);
+                cache.put(orderState.internalOrderId(), orderState);
             }
             
             // Execute remaining batch
@@ -172,7 +173,7 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
             
         } catch (SQLException e) {
             logger.error("Failed to save order state batch", e);
-            throw e;
+            throw new SQLException("Failed to save order state batch to ClickHouse", e);
         }
     }
     
@@ -200,17 +201,18 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    OrderStateRecord record = mapResultSetToRecord(rs);
-                    cache.put(internalOrderId, record);
-                    return record;
+                    OrderStateRecord orderState = mapResultSetToRecord(rs);
+                    cache.put(internalOrderId, orderState);
+                    return orderState;
                 }
             }
             
             return null;
             
         } catch (SQLException e) {
-            logger.error("Failed to get order state for orderId={}", internalOrderId, e);
-            throw e;
+            String errorMsg = String.format("Failed to get order state for orderId=%d", internalOrderId);
+            logger.error(errorMsg, e);
+            throw new SQLException(errorMsg, e);
         }
     }
     
@@ -232,17 +234,17 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
              ResultSet rs = stmt.executeQuery(selectSql)) {
             
             while (rs.next()) {
-                OrderStateRecord record = mapResultSetToRecord(rs);
-                result.put(record.internalOrderId(), record);
-                cache.put(record.internalOrderId(), record);
+                OrderStateRecord orderState = mapResultSetToRecord(rs);
+                result.put(orderState.internalOrderId(), orderState);
+                cache.put(orderState.internalOrderId(), orderState);
             }
             
             logger.info("Loaded {} active orders from ClickHouse", result.size());
             return result;
             
         } catch (SQLException e) {
-            logger.error("Failed to load active orders", e);
-            throw e;
+            logger.error("Failed to load active orders from ClickHouse", e);
+            throw new SQLException("Failed to load active orders from ClickHouse", e);
         }
     }
     
@@ -267,8 +269,8 @@ public class ClickHouseOrderStateStore implements OrderStateStore {
             return 0;
             
         } catch (SQLException e) {
-            logger.error("Failed to count active orders", e);
-            throw e;
+            logger.error("Failed to count active orders in ClickHouse", e);
+            throw new SQLException("Failed to count active orders in ClickHouse", e);
         }
     }
     
