@@ -1,0 +1,13 @@
+# VWAP Strategy Configuration Example
+strategyId: "vwap-googl-001"
+strategyType: "VWAP"
+symbol: "GOOGL"
+duration: "PT30M"  # 30 minutes
+minChildSize: 50
+maxChildSize: 2000
+priceLimit: null
+allowPartialFills: true
+parameters:
+  expectedDayVolume: 5000000  # Expected total daily volume
+  volumeParticipationRate: 0.05  # Target 5% of market volume
+  aggressiveness: "MEDIUM"
