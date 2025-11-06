@@ -1,0 +1,13 @@
+# TWAP Strategy Configuration Example
+strategyId: "twap-aapl-001"
+strategyType: "TWAP"
+symbol: "AAPL"
+duration: "PT10M"  # 10 minutes (ISO 8601 duration format)
+numSlices: 20
+minChildSize: 100
+maxChildSize: 5000
+priceLimit: null  # Optional: Set limit price, null for market price
+allowPartialFills: true
+parameters:
+  urgency: "LOW"
+  venue: "SMART"

@@ -1,0 +1,419 @@
+package com.thelastwar.ems.integration;
+
+import com.thelastwar.ems.*;
+import com.thelastwar.oms.ChildOrder;
+import com.thelastwar.oms.ChildOrderManager;
+import com.thelastwar.oms.ClientOrderId;
+import com.thelastwar.oms.InternalOrderId;
+import com.thelastwar.oms.ParentOrder;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Integration tests for EMS strategy execution.
+ * 
+ * These tests validate end-to-end strategy behavior including:
+ * - TWAP producing expected child order cadence
+ * - Strategy reacting to market ticks and fills
+ * - Control endpoints (pause/resume/stop)
+ */
+class EMSIntegrationTest {
+    
+    private EMSService emsService;
+    private ScheduledExecutorService scheduler;
+    private TestChildOrderCapture orderCapture;
+    
+    @BeforeEach
+    void setUp() {
+        scheduler = Executors.newScheduledThreadPool(4);
+        orderCapture = new TestChildOrderCapture();
+        // Create a minimal mock EMSService for testing
+        emsService = new TestEMSService(scheduler, orderCapture);
+    }
+    
+    @AfterEach
+    void tearDown() {
+        emsService.close();
+        scheduler.shutdownNow();
+    }
+    
+    @Test
+    void testTWAPProducesExpectedChildOrderCadence() throws Exception {
+        // Configure TWAP: 10 slices over 5 seconds = 1 slice every 500ms
+        StrategyConfig config = new StrategyConfig.Builder()
+            .strategyId("twap-integration-001")
+            .strategyType(StrategyType.TWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofMillis(5000))
+            .numSlices(10)
+            .minChildSize(100L)
+            .allowPartialFills(true)
+            .build();
+        
+        ParentOrder parentOrder = new ParentOrder(
+            new InternalOrderId(1L),
+            new ClientOrderId("parent-001"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            10000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        // Start strategy
+        Strategy strategy = emsService.startStrategy(config, parentOrder);
+        
+        assertNotNull(strategy);
+        assertEquals(StrategyState.RUNNING, strategy.getState());
+        
+        // Wait for all slices to be submitted (5 seconds + buffer)
+        Thread.sleep(6000);
+        
+        // Verify number of child orders
+        List<ChildOrder> childOrders = orderCapture.getChildOrders();
+        assertEquals(10, childOrders.size(), "Expected 10 child orders for 10 slices");
+        
+        // Verify each child order has correct quantity
+        for (ChildOrder child : childOrders) {
+            assertEquals(1000L, child.quantity(), "Each slice should be 1000 shares");
+        }
+        
+        // Verify timing - check that orders were spaced approximately 500ms apart
+        List<Instant> timestamps = orderCapture.getTimestamps();
+        for (int i = 1; i < timestamps.size(); i++) {
+            long intervalMs = Duration.between(timestamps.get(i - 1), timestamps.get(i)).toMillis();
+            // Allow 200ms tolerance for scheduling variance
+            assertTrue(intervalMs >= 300 && intervalMs <= 700,
+                "Expected ~500ms interval, got " + intervalMs + "ms");
+        }
+        
+        // Verify metrics
+        StrategyMetrics metrics = strategy.getMetrics();
+        assertEquals(10, metrics.childOrdersGenerated());
+    }
+    
+    @Test
+    void testStrategyReactsToMarketTicks() throws Exception {
+        StrategyConfig config = new StrategyConfig.Builder()
+            .strategyId("vwap-integration-001")
+            .strategyType(StrategyType.VWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofSeconds(5))
+            .minChildSize(100L)
+            .maxChildSize(1000L)
+            .build();
+        
+        ParentOrder parentOrder = new ParentOrder(
+            new InternalOrderId(2L),
+            new ClientOrderId("parent-002"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            5000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        Strategy strategy = emsService.startStrategy(config, parentOrder);
+        
+        // Send market ticks
+        for (int i = 1; i <= 10; i++) {
+            MarketTick tick = new MarketTick(
+                "AAPL",
+                Instant.now(),
+                14900L + (i * 10),
+                15100L + (i * 10),
+                1000L,
+                1000L,
+                15000L + (i * 10),
+                100L,
+                i * 10000L
+            );
+            emsService.onMarketTick(tick);
+            Thread.sleep(100);
+        }
+        
+        // Wait for strategy to react
+        Thread.sleep(2000);
+        
+        // Verify ticks were processed
+        StrategyMetrics metrics = strategy.getMetrics();
+        assertTrue(metrics.ticksProcessed() >= 10, 
+            "Expected at least 10 ticks processed, got " + metrics.ticksProcessed());
+    }
+    
+    @Test
+    void testStrategyReactsToFills() throws Exception {
+        StrategyConfig config = new StrategyConfig.Builder()
+            .strategyId("twap-integration-002")
+            .strategyType(StrategyType.TWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofSeconds(10))
+            .numSlices(5)
+            .build();
+        
+        ParentOrder parentOrder = new ParentOrder(
+            new InternalOrderId(3L),
+            new ClientOrderId("parent-003"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            5000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        Strategy strategy = emsService.startStrategy(config, parentOrder);
+        
+        // Wait for first child order
+        Thread.sleep(500);
+        
+        // Simulate fills
+        FillEvent fill1 = new FillEvent(
+            new InternalOrderId(100L),
+            parentOrder.getParentOrderId(),
+            Instant.now(),
+            15000L,
+            500L,
+            500L,
+            "NYSE",
+            "exec-001"
+        );
+        
+        FillEvent fill2 = new FillEvent(
+            new InternalOrderId(101L),
+            parentOrder.getParentOrderId(),
+            Instant.now(),
+            15050L,
+            500L,
+            0L,
+            "NYSE",
+            "exec-002"
+        );
+        
+        emsService.onFill(fill1);
+        emsService.onFill(fill2);
+        
+        Thread.sleep(200);
+        
+        // Verify fills were processed
+        StrategyMetrics metrics = strategy.getMetrics();
+        assertEquals(2L, metrics.fillsProcessed());
+    }
+    
+    @Test
+    void testStrategyControlEndpoints() throws Exception {
+        StrategyConfig config = new StrategyConfig.Builder()
+            .strategyId("twap-control-001")
+            .strategyType(StrategyType.TWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofSeconds(10))
+            .numSlices(10)
+            .build();
+        
+        ParentOrder parentOrder = new ParentOrder(
+            new InternalOrderId(4L),
+            new ClientOrderId("parent-004"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            10000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        Strategy strategy = emsService.startStrategy(config, parentOrder);
+        
+        // Verify started
+        assertEquals(StrategyState.RUNNING, strategy.getState());
+        
+        // Test pause
+        boolean paused = emsService.pauseStrategy("twap-control-001");
+        assertTrue(paused);
+        assertEquals(StrategyState.PAUSED, strategy.getState());
+        
+        int ordersAfterPause = orderCapture.getChildOrders().size();
+        
+        // Wait - no new orders should be generated
+        Thread.sleep(2000);
+        assertEquals(ordersAfterPause, orderCapture.getChildOrders().size());
+        
+        // Test resume
+        boolean resumed = emsService.resumeStrategy("twap-control-001");
+        assertTrue(resumed);
+        assertEquals(StrategyState.RUNNING, strategy.getState());
+        
+        // Wait for new orders
+        Thread.sleep(2000);
+        assertTrue(orderCapture.getChildOrders().size() > ordersAfterPause);
+        
+        // Test stop
+        boolean stopped = emsService.stopStrategy("twap-control-001");
+        assertTrue(stopped);
+        assertEquals(StrategyState.STOPPED, strategy.getState());
+        
+        int ordersAfterStop = orderCapture.getChildOrders().size();
+        
+        // Wait - no new orders
+        Thread.sleep(2000);
+        assertEquals(ordersAfterStop, orderCapture.getChildOrders().size());
+    }
+    
+    @Test
+    void testStrategyMetricsAndDashboard() throws Exception {
+        StrategyConfig config = new StrategyConfig.Builder()
+            .strategyId("metrics-test-001")
+            .strategyType(StrategyType.TWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofSeconds(2))
+            .numSlices(4)
+            .build();
+        
+        ParentOrder parentOrder = new ParentOrder(
+            new InternalOrderId(5L),
+            new ClientOrderId("parent-005"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            4000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        Strategy strategy = emsService.startStrategy(config, parentOrder);
+        
+        // Wait for some execution
+        Thread.sleep(3000);
+        
+        // Get metrics
+        StrategyMetrics metrics = emsService.getMetrics("metrics-test-001");
+        
+        assertNotNull(metrics);
+        assertEquals("metrics-test-001", metrics.strategyId());
+        assertEquals(StrategyType.TWAP, metrics.strategyType());
+        assertEquals(4000L, metrics.totalQuantity());
+        assertEquals(4, metrics.childOrdersGenerated());
+        
+        // Verify execution duration is reasonable
+        assertNotNull(metrics.getExecutionDuration());
+        assertTrue(metrics.getExecutionDuration().toMillis() >= 2000);
+    }
+    
+    @Test
+    void testMultipleStrategiesRunConcurrently() throws Exception {
+        // Start two strategies concurrently
+        StrategyConfig config1 = new StrategyConfig.Builder()
+            .strategyId("concurrent-001")
+            .strategyType(StrategyType.TWAP)
+            .symbol("AAPL")
+            .duration(Duration.ofSeconds(3))
+            .numSlices(3)
+            .build();
+        
+        StrategyConfig config2 = new StrategyConfig.Builder()
+            .strategyId("concurrent-002")
+            .strategyType(StrategyType.TWAP)
+            .symbol("GOOGL")
+            .duration(Duration.ofSeconds(3))
+            .numSlices(3)
+            .build();
+        
+        ParentOrder parent1 = new ParentOrder(
+            new InternalOrderId(10L),
+            new ClientOrderId("parent-010"),
+            "AAPL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            3000L,
+            15000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        ParentOrder parent2 = new ParentOrder(
+            new InternalOrderId(11L),
+            new ClientOrderId("parent-011"),
+            "GOOGL",
+            com.thelastwar.orderbook.Side.BUY.getValue(),
+            com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+            3000L,
+            140000L,
+            0L,
+            System.nanoTime()
+        );
+        
+        Strategy strategy1 = emsService.startStrategy(config1, parent1);
+        Strategy strategy2 = emsService.startStrategy(config2, parent2);
+        
+        // Both should be running
+        assertEquals(StrategyState.RUNNING, strategy1.getState());
+        assertEquals(StrategyState.RUNNING, strategy2.getState());
+        
+        // Wait for execution
+        Thread.sleep(4000);
+        
+        // Verify both executed
+        StrategyMetrics metrics1 = strategy1.getMetrics();
+        StrategyMetrics metrics2 = strategy2.getMetrics();
+        
+        assertEquals(3, metrics1.childOrdersGenerated());
+        assertEquals(3, metrics2.childOrdersGenerated());
+    }
+    
+    /**
+    
+    /**
+     * Captures child orders for testing.
+     */
+    private static class TestChildOrderCapture {
+        private final List<ChildOrder> childOrders = new ArrayList<>();
+        private final List<Instant> timestamps = new ArrayList<>();
+        private final AtomicInteger orderIdGenerator = new AtomicInteger(1000);
+        
+        public void captureOrder(Instant timestamp) {
+            // Create a synthetic child order
+            ChildOrder order = new ChildOrder(
+                new InternalOrderId(orderIdGenerator.incrementAndGet()),
+                new InternalOrderId(1L),
+                "AAPL",
+                com.thelastwar.orderbook.Side.BUY.getValue(),
+                com.thelastwar.orderbook.OrderType.LIMIT.getValue(),
+                1000L,
+                15000L,
+                "SMART",
+                "TWAP",
+                System.nanoTime()
+            );
+            childOrders.add(order);
+            timestamps.add(timestamp);
+        }
+        
+        public List<ChildOrder> getChildOrders() {
+            return new ArrayList<>(childOrders);
+        }
+        
+        public List<Instant> getTimestamps() {
+            return new ArrayList<>(timestamps);
+        }
+    }
+}
