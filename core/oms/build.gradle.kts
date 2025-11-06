@@ -8,7 +8,7 @@ version = "1.0.0-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
@@ -22,8 +22,9 @@ dependencies {
     api(project(":core:orderbook"))
     api(project(":core:risk"))
 
-    // PostgreSQL for persistence
-    implementation("org.postgresql:postgresql:42.7.4")
+    // ClickHouse for persistence (replacing PostgreSQL)
+    implementation("com.clickhouse:clickhouse-jdbc:0.6.0")
+    implementation("com.clickhouse:clickhouse-client:0.6.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
 
     // Kafka for event sourcing
@@ -42,7 +43,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
     testImplementation("org.testcontainers:testcontainers:1.20.2")
-    testImplementation("org.testcontainers:postgresql:1.20.2")
+    testImplementation("org.testcontainers:clickhouse:1.20.2")
     testImplementation("org.testcontainers:kafka:1.20.2")
     testImplementation("org.testcontainers:junit-jupiter:1.20.2")
 }
