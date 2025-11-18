@@ -35,7 +35,7 @@ The architecture is **event-driven, memory-resident, and horizontally sharded**,
 ## ⚙️ Technology Stack
 
 ### Language & Runtime
-- **Java 25** (primary language)
+- **Java 21** (primary language)
 - **Kotlin** (utility & DSL modules)
 - **JMH / Chronicle Benchmark** (micro-benchmarks)
 
@@ -43,7 +43,7 @@ The architecture is **event-driven, memory-resident, and horizontally sharded**,
 - **Aeron** / **Chronicle Queue** (low-latency transport)
 - **Kafka** / **Redpanda** (persistent event log)
 - **Chronicle Map** (off-heap cache)
-- **PostgreSQL / ClickHouse** (persistence)
+- **ClickHouse** (high-performance analytics and persistence)
 - **Avro / Protobuf** (schema evolution)
 
 ### Build & Dependency Management
@@ -86,7 +86,7 @@ Deterministic replay: event log acts as system-of-record.
 
 Coding Standards
 
-Java 25 with strict compiler flags (-Xlint:all -Werror).
+Java 21 with strict compiler flags (-Xlint:all -Werror).
 
 Static analysis via PMD, SpotBugs, and ErrorProne.
 
@@ -140,48 +140,50 @@ multi-asset-trading-platform/
     ├── COPILOT_INSTRUCTIONS.md
     └── workflows/
 
-🧭 Local Development Setup
+🧭 Local Setup
 
-For comprehensive local development environment setup, see **[README-local.md](./README-local.md)**
+For complete local setup instructions (without Docker/Kubernetes), see [LOCAL_SETUP.md](LOCAL_SETUP.md).
 
 ### Quick Start
 
 ```bash
-# Start all services (LocalStack, Kafka, PostgreSQL, ClickHouse, Redis)
-make quickstart
+# Complete automated setup
+./scripts/setup-local.sh
 
-# Or manually
-docker compose up -d
-./scripts/localstack-bootstrap.sh
+# Start all services
+./scripts/start-services.sh
 
-# Validate setup
-make validate
+# Check service status
+./scripts/check-services.sh
 
-# Build the project
-./gradlew build
-
-# Run integration examples
-make test-integration
+# Stop all services
+./scripts/stop-services.sh
 ```
 
 ### Prerequisites
 
-- **JDK 25+**
-- **Docker & Docker Compose**
-- **Gradle Wrapper** (./gradlew)
-- **AWS CLI** (for LocalStack interaction)
-- Optional: Linux (low-latency tuned kernel recommended)
+JDK 21+
 
-### Access Points
+ClickHouse 24.3+
 
-- **LocalStack** (AWS services) → http://localhost:4566
-- **Redpanda Console** (Kafka UI) → http://localhost:8090
-- **Trader UI** (if available) → http://localhost:8080
-- **PostgreSQL** → localhost:5432
-- **ClickHouse** → http://localhost:8123
-- **Redis** → localhost:6379
+Kafka 3.8.0+
 
-See [README-local.md](./README-local.md) for detailed setup instructions, testing guides, and integration examples.
+Gradle Wrapper (./gradlew)
+
+Optional: Linux (low-latency tuned kernel recommended)
+
+Run Locally
+docker-compose up
+./gradlew run
+
+
+Access:
+
+Trader UI → http://localhost:8080
+
+Grafana → http://localhost:3000
+
+Prometheus → http://localhost:9090
 
 🤖 Copilot Guidance
 

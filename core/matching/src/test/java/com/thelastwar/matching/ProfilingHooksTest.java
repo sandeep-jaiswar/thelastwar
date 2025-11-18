@@ -122,6 +122,12 @@ class ProfilingHooksTest {
     void testZeroOverheadWhenDisabled() {
         ProfilingHooks hooks = new ProfilingHooks(false);
         
+        // Warmup - critical for microbenchmarks to avoid JIT compilation overhead
+        for (int i = 0; i < 1000; i++) {
+            hooks.onOrderProcessingStart(i, "AAPL");
+            hooks.onOrderProcessingEnd(0, i);
+        }
+        
         // Measure time for many no-op calls
         long iterations = 10000;
         long start = System.nanoTime();
@@ -138,9 +144,10 @@ class ProfilingHooksTest {
         long totalNanos = end - start;
         double avgNanosPerOp = totalNanos / (iterations * 5.0);
         
-        // Should be nearly zero overhead (< 50ns per operation when disabled)
-        // Note: Increased threshold to account for CI environment variability
+        // Disabled profiling should have minimal overhead
+        // In test environment, allow reasonable threshold accounting for JVM overhead
         System.out.println("Average time per disabled profiling call: " + avgNanosPerOp + " ns");
-        assertTrue(avgNanosPerOp < 50, "Disabled profiling should have < 50ns overhead per call");
+        assertTrue(avgNanosPerOp < 50, 
+            "Disabled profiling should have < 50ns overhead per call (test environment), was: " + avgNanosPerOp + "ns");
     }
 }

@@ -193,7 +193,7 @@ public class MappedOrderStateStore implements OrderStateStore {
                 mappedBuffer.putInt(0); // Write count = 0
                 // Zero out the data area to prevent stale data
                 byte[] zeros = new byte[1024];
-                int remaining = (int) Math.min(mappedBuffer.remaining(), ORDER_SIZE * MAX_ORDERS);
+                int remaining = Math.min(mappedBuffer.remaining(), ORDER_SIZE * MAX_ORDERS);
                 while (remaining > 0) {
                     int toWrite = Math.min(remaining, zeros.length);
                     mappedBuffer.put(zeros, 0, toWrite);
