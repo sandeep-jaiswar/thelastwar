@@ -13,7 +13,7 @@ echo "=========================================="
 echo "Waiting for LocalStack to be ready..."
 max_attempts=30
 attempt=0
-until curl -s http://localhost:4566/_localstack/health | grep -q '"s3": "running"' || [ $attempt -eq $max_attempts ]; do
+until curl -s http://localhost:4566/_localstack/health | grep -q '"s3": "available"' || [ $attempt -eq $max_attempts ]; do
     echo "Attempt $((attempt+1))/$max_attempts - LocalStack not ready yet..."
     sleep 2
     attempt=$((attempt+1))

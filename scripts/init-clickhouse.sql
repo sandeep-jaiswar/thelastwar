@@ -98,12 +98,12 @@ SETTINGS index_granularity = 8192;
 
 -- Materialized view for order book snapshots
 CREATE MATERIALIZED VIEW IF NOT EXISTS ticks.orderbook_snapshots_mv
-ENGINE = AggregatingMergeTree()
-PARTITION BY toYYYYMMDD(timestamp)
-ORDER BY (symbol, timestamp)
+ENGINE = SummingMergeTree()
+PARTITION BY toYYYYMMDD(snapshot_time)
+ORDER BY (symbol, snapshot_time)
 AS SELECT
     symbol,
-    toStartOfMinute(timestamp) as timestamp,
+    toStartOfMinute(timestamp) as snapshot_time,
     argMax(bid_price, timestamp) as best_bid,
     argMax(ask_price, timestamp) as best_ask,
     argMax(bid_size, timestamp) as bid_size,
@@ -115,11 +115,11 @@ GROUP BY symbol, toStartOfMinute(timestamp);
 -- Materialized view for trade statistics by symbol
 CREATE MATERIALIZED VIEW IF NOT EXISTS ticks.trade_stats_mv
 ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMMDD(execution_timestamp)
-ORDER BY (symbol, execution_timestamp)
+PARTITION BY toYYYYMMDD(trade_time)
+ORDER BY (symbol, trade_time)
 AS SELECT
     symbol,
-    toStartOfMinute(execution_timestamp) as execution_timestamp,
+    toStartOfMinute(execution_timestamp) as trade_time,
     count() as trade_count,
     sum(quantity) as total_quantity,
     avg(price) as average_price,
@@ -132,12 +132,12 @@ GROUP BY symbol, toStartOfMinute(execution_timestamp);
 -- Materialized view for risk check statistics
 CREATE MATERIALIZED VIEW IF NOT EXISTS ticks.risk_stats_mv
 ENGINE = SummingMergeTree()
-PARTITION BY toYYYYMMDD(event_timestamp)
-ORDER BY (account_id, risk_check_type, event_timestamp)
+PARTITION BY toYYYYMMDD(check_time)
+ORDER BY (account_id, risk_check_type, check_time)
 AS SELECT
     account_id,
     risk_check_type,
-    toStartOfMinute(event_timestamp) as event_timestamp,
+    toStartOfMinute(event_timestamp) as check_time,
     countIf(check_result = 'PASS') as passed_checks,
     countIf(check_result = 'FAIL') as failed_checks,
     countIf(check_result = 'WARNING') as warning_checks,

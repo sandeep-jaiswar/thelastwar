@@ -9,11 +9,11 @@ services:
     environment:
       - SERVICES=s3,sqs,sns,secretsmanager,cloudwatch,dynamodb
       - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
+      - DATA_DIR=/var/lib/localstack
       - DOCKER_HOST=unix:///var/run/docker.sock
       - DEFAULT_REGION=us-east-1
     volumes:
-      - "./localstack-data:/tmp/localstack"
+      - "localstack-data:/var/lib/localstack"
       - "/var/run/docker.sock:/var/run/docker.sock"
       - "./scripts/localstack-bootstrap.sh:/etc/localstack/init/ready.d/init-aws.sh"
     networks:
@@ -57,18 +57,10 @@ services:
   redpanda-console:
     image: docker.redpanda.com/redpandadata/console:latest
     container_name: redpanda-console
-    entrypoint: /bin/sh
-    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
     environment:
-      CONFIG_FILEPATH: /tmp/config.yml
-      CONSOLE_CONFIG_FILE: |
-        kafka:
-          brokers: ["redpanda:9092"]
-          schemaRegistry:
-            enabled: true
-            urls: ["http://redpanda:8081"]
-        connect:
-          enabled: false
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_SCHEMAREGISTRY_ENABLED: "true"
+      KAFKA_SCHEMAREGISTRY_URLS: http://redpanda:8081
     ports:
       - "8090:8080"
     networks:
@@ -147,6 +139,8 @@ networks:
     name: trading-network
 
 volumes:
+  localstack-data:
+    driver: local
   redpanda-data:
     driver: local
   postgres-data:
