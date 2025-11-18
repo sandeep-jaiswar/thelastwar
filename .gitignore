@@ -41,3 +41,10 @@ aeron_gc.log
 
 # Flight Recorder files
 *.jfr
+
+# Docker and LocalStack
+localstack-data/
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl

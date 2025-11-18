@@ -30,7 +30,7 @@ public class InMemoryEventBus implements EventBus {
     public InMemoryEventBus() {
         // Pre-allocate handler arrays for all possible event types
         // Using arrays indexed by event type for O(1) lookup
-        this.handlers = new List[10000];
+        this.handlers = (List<HandlerRegistration>[]) new List[10000];
         for (int i = 0; i < handlers.length; i++) {
             handlers[i] = new CopyOnWriteArrayList<>();
         }

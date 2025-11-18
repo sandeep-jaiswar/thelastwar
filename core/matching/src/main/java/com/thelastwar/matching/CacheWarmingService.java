@@ -4,9 +4,9 @@ import com.thelastwar.eventbus.*;
 import com.thelastwar.eventbus.model.OrderEvent;
 import io.micrometer.core.instrument.*;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -85,10 +85,12 @@ public class CacheWarmingService {
             return t;
         });
         
-        this.symbolActivity = new ConcurrentHashMap<>();
-        this.accountActivity = new ConcurrentHashMap<>();
-        this.warmedSymbols = ConcurrentHashMap.newKeySet();
-        this.warmedAccounts = ConcurrentHashMap.newKeySet();
+        // Pre-size maps for HFT workloads to avoid resizing overhead
+        // Assume ~1000 active symbols and ~10000 active accounts
+        this.symbolActivity = new ConcurrentHashMap<>(1024, 0.75f, 16);
+        this.accountActivity = new ConcurrentHashMap<>(16384, 0.75f, 16);
+        this.warmedSymbols = ConcurrentHashMap.newKeySet(1024);
+        this.warmedAccounts = ConcurrentHashMap.newKeySet(16384);
         
         this.cacheHits = new AtomicLong(0);
         this.cacheMisses = new AtomicLong(0);
@@ -164,35 +166,35 @@ public class CacheWarmingService {
         if (!(event.payload() instanceof OrderEvent orderEvent)) {
             return;
         }
-        
-        long startTime = System.nanoTime();
-        long currentTime = System.nanoTime();  // Use consistent clock
-        
-        // Track symbol activity
+
+        // Single timestamp for all operations - minimize system calls
+        long currentTime = System.nanoTime();
+
+        // Track symbol activity - optimized lookup
         String symbol = orderEvent.symbol();
-        symbolActivity.computeIfAbsent(symbol, k -> new ActivityCounter())
-            .recordActivity(currentTime);
-        
-        // Track account activity
+        ActivityCounter symbolCounter = symbolActivity.get(symbol);
+        if (symbolCounter == null) {
+            // Only use computeIfAbsent if not present - avoid lambda allocation on hot path
+            symbolCounter = symbolActivity.computeIfAbsent(symbol, k -> new ActivityCounter());
+        }
+        symbolCounter.recordActivity(currentTime);
+
+        // Track account activity - optimized lookup  
         long account = orderEvent.account();
-        accountActivity.computeIfAbsent(account, k -> new ActivityCounter())
-            .recordActivity(currentTime);
-        
+        ActivityCounter accountCounter = accountActivity.get(account);
+        if (accountCounter == null) {
+            accountCounter = accountActivity.computeIfAbsent(account, k -> new ActivityCounter());
+        }
+        accountCounter.recordActivity(currentTime);
+
         // Check if this symbol/account was pre-warmed (hit tracking)
+        // Use single conditional to minimize branching
         if (warmedSymbols.contains(symbol) || warmedAccounts.contains(account)) {
             cacheHits.incrementAndGet();
         } else {
             cacheMisses.incrementAndGet();
         }
-        
-        // Ensure latency impact < 1 µs (1000 ns)
-        long elapsed = System.nanoTime() - startTime;
-        if (elapsed > 1000) {
-            // Log warning if latency exceeds target (could use a rate-limited logger)
-            // For now, just track via metrics
-        }
-    }
-    
+    }    
     /**
      * Performs cache warming for hot symbols and accounts.
      */
@@ -316,27 +318,49 @@ public class CacheWarmingService {
     }
     
     /**
-     * Activity counter with timestamp-based tracking.
-     * Uses CopyOnWriteArrayList for lock-free reads with occasional writes.
+     * Ultra-fast activity counter optimized for HFT latency requirements.
+     * 
+     * Uses a rolling window approach with circular buffer to avoid expensive 
+     * collection operations in the hot path.
      */
     private static class ActivityCounter {
-        private final List<Long> timestamps = new CopyOnWriteArrayList<>();
+        private static final int WINDOW_SIZE = 3600; // 1 hour in seconds
+        private static final long SECOND_NS = 1_000_000_000L;
+        
+        // Circular buffer for per-second counters
+        private final AtomicIntegerArray secondCounters = new AtomicIntegerArray(WINDOW_SIZE);
+        private volatile long lastSecond = -1;
         
         void recordActivity(long timestamp) {
-            timestamps.add(timestamp);
+            // Convert to seconds to reduce granularity
+            long currentSecond = timestamp / SECOND_NS;
             
-            // Periodic cleanup to prevent unbounded growth
-            // Remove timestamps older than 2 hours
-            if (timestamps.size() > 100) {
-                long cutoff = System.nanoTime() - TimeUnit.HOURS.toNanos(2);
-                timestamps.removeIf(ts -> ts < cutoff);
+            // Update circular buffer index
+            int index = (int) (currentSecond % WINDOW_SIZE);
+            
+            // Reset counter if we've moved to a new second
+            if (currentSecond != lastSecond) {
+                // Clear old entries (lazy approach - only clear current slot)
+                secondCounters.set(index, 0);
+                lastSecond = currentSecond;
             }
+            
+            // Increment counter for current second
+            secondCounters.incrementAndGet(index);
         }
         
         int getActivityCount(long since) {
-            return (int) timestamps.stream()
-                .filter(ts -> ts >= since)
-                .count();
+            long currentTime = System.nanoTime();
+            long sinceSecond = since / SECOND_NS;
+            long currentSecond = currentTime / SECOND_NS;
+            
+            int count = 0;
+            // Sum up counters for the time window
+            for (long sec = sinceSecond; sec <= currentSecond; sec++) {
+                int index = (int) (sec % WINDOW_SIZE);
+                count += secondCounters.get(index);
+            }
+            return count;
         }
     }
     
